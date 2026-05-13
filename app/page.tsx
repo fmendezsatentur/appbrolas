@@ -103,11 +103,9 @@ export default function MarketplacePage() {
   }, [sealedTag, sort])
 
   React.useEffect(() => {
-    if (tab === 'sealed') {
-      const t = setTimeout(fetchSealed, 300)
-      return () => clearTimeout(t)
-    }
-  }, [fetchSealed, tab])
+    const t = setTimeout(fetchSealed, 300)
+    return () => clearTimeout(t)
+  }, [fetchSealed])
 
   // Group duplicate card listings
   const grouped: GroupedListing[] = React.useMemo(() => {
