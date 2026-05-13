@@ -21,10 +21,26 @@ export interface AuctionWithMeta {
 
 export default function AuctionCard({ auction }: { auction: AuctionWithMeta }) {
   const ended = auction.status === 'ended'
+  const msLeft = new Date(auction.endTime).getTime() - Date.now()
+  const isUrgent = !ended && msLeft < 60 * 60 * 1000 // menos de 1 hora
 
   return (
     <Link href={`/subastas/${auction.id}`} className="block group">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden hover:border-yellow-500/60 transition-all duration-200 hover:shadow-lg hover:shadow-yellow-500/10 h-full flex flex-col">
+      <div className={`relative rounded-xl overflow-hidden transition-all duration-200 h-full flex flex-col
+        ${ended
+          ? 'bg-zinc-900/60 border border-zinc-800 opacity-70'
+          : isUrgent
+            ? 'bg-zinc-900 border-2 border-red-500/70 shadow-lg shadow-red-500/20 hover:shadow-red-500/40 hover:border-red-400'
+            : 'bg-zinc-900 border-2 border-yellow-500/40 shadow-md shadow-yellow-500/10 hover:border-yellow-400 hover:shadow-yellow-500/30'
+        }`}>
+
+        {/* Urgency ribbon */}
+        {isUrgent && !ended && (
+          <div className="absolute top-2 left-2 z-10 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">
+            ¡Termina pronto!
+          </div>
+        )}
+
         <div className="relative aspect-[4/3] bg-zinc-800">
           {auction.imageUrl ? (
             <Image

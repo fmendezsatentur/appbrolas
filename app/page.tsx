@@ -130,11 +130,9 @@ export default function MarketplacePage() {
   }, [auctionStatus])
 
   React.useEffect(() => {
-    if (tab === 'auctions') {
-      const t = setTimeout(fetchAuctions, 300)
-      return () => clearTimeout(t)
-    }
-  }, [fetchAuctions, tab])
+    const t = setTimeout(fetchAuctions, 300)
+    return () => clearTimeout(t)
+  }, [fetchAuctions])
 
   // Group duplicate card listings
   const grouped: GroupedListing[] = React.useMemo(() => {
@@ -201,32 +199,32 @@ export default function MarketplacePage() {
           <button
             type="button"
             onClick={() => setTab('cards')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-4 py-2.5 text-base font-semibold border-b-2 transition-colors ${
               tab === 'cards' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             Cartas sueltas
-            {!loadingCards && <span className="ml-2 text-xs text-muted-foreground">({grouped.length})</span>}
+            {!loadingCards && <span className="ml-2 text-xs font-normal text-muted-foreground">({grouped.length})</span>}
           </button>
           <button
             type="button"
             onClick={() => setTab('sealed')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-4 py-2.5 text-base font-semibold border-b-2 transition-colors ${
               tab === 'sealed' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             Material sellado
-            {!loadingSealed && <span className="ml-2 text-xs text-muted-foreground">({sealed.length})</span>}
+            {!loadingSealed && <span className="ml-2 text-xs font-normal text-muted-foreground">({sealed.length})</span>}
           </button>
           <button
             type="button"
             onClick={() => setTab('auctions')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-4 py-2.5 text-base font-semibold border-b-2 transition-colors ${
               tab === 'auctions' ? 'border-yellow-400 text-yellow-400' : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             🔨 Subastas
-            {!loadingAuctions && tab === 'auctions' && <span className="ml-2 text-xs text-muted-foreground">({auctions.length})</span>}
+            {!loadingAuctions && auctions.length > 0 && <span className="ml-2 text-xs font-normal text-yellow-400/70">({auctions.length})</span>}
           </button>
 
           {/* Sort — right aligned */}
