@@ -19,6 +19,7 @@ export interface ListingWithUser {
     id: string
     name: string | null
     image: string | null
+    phone: string | null
   }
 }
 

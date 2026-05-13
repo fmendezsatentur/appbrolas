@@ -88,6 +88,7 @@ export default function MarketplacePage() {
         maxQuantity: listing.quantity,
         imageUrl: listing.imageUrl ?? '',
         sellerName: listing.user.name ?? 'Vendedor',
+        sellerPhone: listing.user.phone ?? null,
         condition: listing.condition,
         isFoil: listing.isFoil,
       }

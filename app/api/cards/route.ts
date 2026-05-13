@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       ...(condition && { condition }),
     },
     include: {
-      user: { select: { id: true, name: true, email: true, image: true } },
+      user: { select: { id: true, name: true, email: true, image: true, phone: true } },
     },
     orderBy: { createdAt: 'desc' },
   })

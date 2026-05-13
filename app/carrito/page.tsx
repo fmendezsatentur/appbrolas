@@ -1,6 +1,5 @@
 'use client'
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Navbar } from '@/components/Navbar'
 import { ShoppingCart, type CartItem } from '@/components/ui/shopping-cart'
@@ -9,7 +8,6 @@ import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
 export default function CarritoPage() {
-  const router = useRouter()
   const [cart, setCart] = React.useState<CartItem[]>([])
 
   React.useEffect(() => {
@@ -35,42 +33,36 @@ export default function CarritoPage() {
   }
 
   const handleCheckout = () => {
-    // Agrupamos por vendedor para hacer múltiples mensajes de WhatsApp
-    const bySeller: Record<string, CartItem[]> = {}
+    if (cart.length === 0) return
+
+    // Agrupar por vendedor
+    const bySeller: Record<string, { items: CartItem[]; phone: string | null }> = {}
     for (const item of cart) {
-      if (!bySeller[item.sellerName]) bySeller[item.sellerName] = []
-      bySeller[item.sellerName].push(item)
+      if (!bySeller[item.sellerName]) {
+        bySeller[item.sellerName] = { items: [], phone: item.sellerPhone }
+      }
+      bySeller[item.sellerName].items.push(item)
     }
 
-    const sellerNames = Object.keys(bySeller)
+    const sellers = Object.entries(bySeller)
 
-    if (sellerNames.length === 1) {
-      const seller = sellerNames[0]
-      const items = bySeller[seller]
-      const total = items.reduce((s, i) => s + i.price * i.quantity, 0)
+    // Un mensaje de WhatsApp por vendedor
+    for (const [sellerName, { items, phone }] of sellers) {
+      const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0)
       const lines = items
         .map((i) => `• ${i.quantity}x ${i.name} (${i.condition}${i.isFoil ? ' Foil' : ''}) — $${(i.price * i.quantity).toFixed(2)}`)
         .join('\n')
-      const msg = encodeURIComponent(
-        `Hola ${seller}! Quiero comprar las siguientes cartas:\n\n${lines}\n\nTotal: $${total.toFixed(2)}\n\n¿Las tenés disponibles?`
-      )
-      window.open(`https://wa.me/?text=${msg}`, '_blank')
-    } else {
-      // Múltiples vendedores: mostramos un resumen
-      const totalGeneral = cart.reduce((s, i) => s + i.price * i.quantity, 0)
-      const resumen = sellerNames
-        .map((seller) => {
-          const items = bySeller[seller]
-          const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0)
-          const lines = items.map((i) => `  - ${i.quantity}x ${i.name}: $${(i.price * i.quantity).toFixed(2)}`).join('\n')
-          return `*${seller}* ($${subtotal.toFixed(2)}):\n${lines}`
-        })
-        .join('\n\n')
 
       const msg = encodeURIComponent(
-        `Pedido Magic Market:\n\n${resumen}\n\n*Total general: $${totalGeneral.toFixed(2)}*`
+        `Hola ${sellerName}! Quiero comprar estas cartas de Magic Market:\n\n${lines}\n\nSubtotal: $${subtotal.toFixed(2)}\n\n¿Las tenés disponibles?`
       )
-      window.open(`https://wa.me/?text=${msg}`, '_blank')
+
+      // Si tiene número, abre WhatsApp directo. Si no, abre con texto para que elija.
+      const url = phone
+        ? `https://wa.me/${phone.replace(/\D/g, '')}?text=${msg}`
+        : `https://wa.me/?text=${msg}`
+
+      window.open(url, '_blank')
     }
   }
 
@@ -94,6 +86,22 @@ export default function CarritoPage() {
           onRemoveItem={handleRemove}
           onCheckout={handleCheckout}
         />
+
+        {cart.length > 0 && (
+          <div className="mt-4 p-4 rounded-lg border border-border bg-card text-sm text-muted-foreground space-y-1">
+            <p className="font-medium text-foreground">¿Cómo funciona el checkout?</p>
+            {[...new Set(cart.map((i) => i.sellerName))].map((seller) => {
+              const sellerItems = cart.filter((i) => i.sellerName === seller)
+              const phone = sellerItems[0].sellerPhone
+              return (
+                <p key={seller}>
+                  · <span className="font-medium">{seller}</span>:{' '}
+                  {phone ? `se abre WhatsApp directo (${phone})` : 'no tiene número — te mostrará el texto para copiar'}
+                </p>
+              )
+            })}
+          </div>
+        )}
       </main>
     </div>
   )
