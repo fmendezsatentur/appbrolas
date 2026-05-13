@@ -7,12 +7,15 @@ export interface ListingWithUser {
   id: string
   cardName: string
   setName: string | null
+  setCode: string | null
   condition: string
   isFoil: boolean
   quantity: number
   price: number
   priceRef: number | null
   imageUrl: string | null
+  scryfallId: string | null
+  colors: string[]
   language: string
   notes: string | null
   user: {
