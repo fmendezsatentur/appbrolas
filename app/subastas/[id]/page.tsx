@@ -152,14 +152,17 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
               <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-sm">Precio actual</span>
-                  <span className="text-yellow-400 font-bold text-2xl">
-                    ${auction.currentPrice.toLocaleString('es-AR')}
-                  </span>
+                  <div className="text-right">
+                    <span className="text-yellow-400 font-bold text-2xl">
+                      ${auction.currentPrice.toLocaleString('es-AR')}
+                    </span>
+                    <span className="ml-1.5 text-xs text-zinc-500 font-normal">ARS</span>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-zinc-400">Incremento mínimo</span>
-                  <span className="text-zinc-200">${auction.minIncrement.toLocaleString('es-AR')}</span>
+                  <span className="text-zinc-200">${auction.minIncrement.toLocaleString('es-AR')} <span className="text-xs text-zinc-500">ARS</span></span>
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
@@ -227,7 +230,7 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
                           type="number"
                           min={minBid}
                           step={auction.minIncrement}
-                          placeholder={`Mínimo $${minBid.toLocaleString('es-AR')}`}
+                          placeholder={`Mínimo $${minBid.toLocaleString('es-AR')} ARS`}
                           value={bidAmount}
                           onChange={e => setBidAmount(e.target.value)}
                           className="bg-zinc-800 border-zinc-600 text-white"
@@ -242,7 +245,7 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
                         className="w-full border-zinc-600 text-zinc-300 hover:bg-zinc-800"
                         onClick={() => { setBidAmount(String(minBid)); handleBidClick() }}
                       >
-                        Ofertar mínimo (${minBid.toLocaleString('es-AR')})
+                        Ofertar mínimo (${minBid.toLocaleString('es-AR')} ARS)
                       </Button>
                     </>
                   )}
