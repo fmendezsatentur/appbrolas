@@ -66,24 +66,45 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
     }
   }
 
-  const fetchScryfallCard = async (card: ParsedCard) => {
-    const url = card.setCode && card.collectorNumber
-      ? `/api/scryfall?set=${card.setCode}&number=${encodeURIComponent(card.collectorNumber)}&name=${encodeURIComponent(card.name)}`
-      : `/api/scryfall?name=${encodeURIComponent(card.name)}`
-    const res = await fetch(url)
-    if (!res.ok) return null
-    return res.json()
-  }
-
   const enrichCards = async (cards: ParsedCard[]) => {
     setEnrichProgress(0)
+    const BATCH = 75
     const results: CardToPublish[] = []
 
-    for (let i = 0; i < cards.length; i++) {
-      const card = cards[i]
+    for (let start = 0; start < cards.length; start += BATCH) {
+      const batch = cards.slice(start, start + BATCH)
+
+      // Build Scryfall identifiers — prefer set+number (exact), fall back to name
+      const identifiers = batch.map((c) =>
+        c.setCode && c.collectorNumber
+          ? { set: c.setCode.toLowerCase(), collector_number: c.collectorNumber }
+          : { name: c.name }
+      )
+
+      // Build lookup map from Scryfall collection response
+      const sfMap = new Map<string, any>()
       try {
-        const sf = await fetchScryfallCard(card)
-        if (sf && !sf.error) {
+        const res = await fetch('/api/scryfall/collection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifiers }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          for (const sf of data.data ?? []) {
+            sfMap.set(sf.name.toLowerCase(), sf)
+            sfMap.set(`${sf.set}:${sf.collector_number}`, sf)
+          }
+        }
+      } catch {}
+
+      for (const card of batch) {
+        const key = card.setCode && card.collectorNumber
+          ? `${card.setCode.toLowerCase()}:${card.collectorNumber}`
+          : card.name.toLowerCase()
+        const sf = sfMap.get(key) ?? sfMap.get(card.name.toLowerCase())
+
+        if (sf) {
           const priceRef = getCardPrice(sf) ?? undefined
           results.push({
             cardName: sf.name,
@@ -110,20 +131,11 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
             condition: 'NM',
             isFoil: false,
             language: 'en',
-            scryfallId: undefined,
           })
         }
-      } catch {
-        results.push({
-          cardName: card.name,
-          quantity: card.quantity,
-          price: 0.5,
-          condition: 'NM',
-          isFoil: false,
-          language: 'en',
-        })
       }
-      setEnrichProgress(Math.round(((i + 1) / cards.length) * 100))
+
+      setEnrichProgress(Math.round((Math.min(start + BATCH, cards.length) / cards.length) * 100))
     }
 
     setEnriched(results)
