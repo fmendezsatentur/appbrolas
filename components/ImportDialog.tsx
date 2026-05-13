@@ -4,10 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Loader2, Upload } from 'lucide-react'
+import { Loader2, Upload, Search, AlertCircle } from 'lucide-react'
 import type { ParsedCard } from '@/lib/moxfield'
-import { searchCardByName, getCardImageUrl, getCardPrice } from '@/lib/scryfall'
+import { getCardImageUrl, getCardPrice } from '@/lib/scryfall'
 
 export interface CardToPublish {
   cardName: string
@@ -66,6 +65,15 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
     }
   }
 
+  const fetchScryfallCard = async (card: ParsedCard) => {
+    const url = card.setCode && card.collectorNumber
+      ? `/api/scryfall?set=${card.setCode}&number=${encodeURIComponent(card.collectorNumber)}&name=${encodeURIComponent(card.name)}`
+      : `/api/scryfall?name=${encodeURIComponent(card.name)}`
+    const res = await fetch(url)
+    if (!res.ok) return null
+    return res.json()
+  }
+
   const enrichCards = async (cards: ParsedCard[]) => {
     setEnrichProgress(0)
     const results: CardToPublish[] = []
@@ -73,9 +81,8 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
     for (let i = 0; i < cards.length; i++) {
       const card = cards[i]
       try {
-        const res = await fetch(`/api/scryfall?name=${encodeURIComponent(card.name)}`)
-        if (res.ok) {
-          const sf = await res.json()
+        const sf = await fetchScryfallCard(card)
+        if (sf && !sf.error) {
           const priceRef = getCardPrice(sf) ?? undefined
           results.push({
             cardName: sf.name,
@@ -101,6 +108,7 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
             condition: 'NM',
             isFoil: false,
             language: 'en',
+            scryfallId: undefined,
           })
         }
       } catch {
@@ -118,6 +126,33 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
 
     setEnriched(results)
     setStep('review')
+  }
+
+  const reSearchCard = async (i: number) => {
+    const card = enriched[i]
+    setEnriched((prev) => prev.map((c, idx) => idx === i ? { ...c, _searching: true } as any : c))
+    try {
+      const res = await fetch(`/api/scryfall?name=${encodeURIComponent(card.cardName)}`)
+      if (res.ok) {
+        const sf = await res.json()
+        if (!sf.error) {
+          const priceRef = getCardPrice(sf) ?? undefined
+          setEnriched((prev) => prev.map((c, idx) => idx === i ? {
+            ...c,
+            cardName: sf.name,
+            setName: sf.set_name,
+            setCode: sf.set,
+            collectorNumber: sf.collector_number,
+            price: priceRef ?? c.price,
+            priceRef,
+            imageUrl: getCardImageUrl(sf),
+            scryfallId: sf.id,
+          } as any : c))
+          return
+        }
+      }
+    } catch {}
+    setEnriched((prev) => prev.map((c, idx) => idx === i ? { ...c, _searching: false } as any : c))
   }
 
   const updateCard = (i: number, field: keyof CardToPublish, value: any) => {
@@ -196,37 +231,63 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
             </div>
 
             <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
-              {enriched.map((card, i) => (
-                <div key={i} className="flex items-center gap-3 p-2 border border-border rounded-lg">
-                  {card.imageUrl && (
-                    <img src={card.imageUrl} alt={card.cardName} className="w-10 h-14 object-cover rounded" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{card.cardName}</p>
-                    <p className="text-xs text-muted-foreground">{card.setName} · x{card.quantity}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">$</span>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={card.price}
-                      onChange={(e) => updateCard(i, 'price', parseFloat(e.target.value))}
-                      className="w-20 h-8 text-sm"
-                    />
-                  </div>
-                  <select
-                    value={card.condition}
-                    onChange={(e) => updateCard(i, 'condition', e.target.value)}
-                    className="text-xs border border-border rounded px-1 py-1 bg-background"
+              {enriched.map((card, i) => {
+                const failed = !card.scryfallId
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-3 p-2 border rounded-lg ${failed ? 'border-destructive/50 bg-destructive/5' : 'border-border'}`}
                   >
-                    {['NM', 'LP', 'MP', 'HP', 'DMG'].map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-              ))}
+                    {card.imageUrl ? (
+                      <img src={card.imageUrl} alt={card.cardName} className="w-10 h-14 object-cover rounded flex-shrink-0" />
+                    ) : (
+                      <div className="w-10 h-14 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                        <AlertCircle className="h-4 w-4 text-destructive" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div className="flex items-center gap-1">
+                        <Input
+                          value={card.cardName}
+                          onChange={(e) => updateCard(i, 'cardName', e.target.value)}
+                          className={`h-7 text-sm font-medium ${failed ? 'border-destructive/50' : ''}`}
+                          placeholder="Nombre de la carta"
+                        />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 flex-shrink-0"
+                          onClick={() => reSearchCard(i)}
+                          title="Buscar en Scryfall"
+                        >
+                          <Search className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{card.setName ?? (failed ? 'No encontrada — editá el nombre y presioná la lupa' : '')} · x{card.quantity}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-xs text-muted-foreground">$</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={card.price}
+                        onChange={(e) => updateCard(i, 'price', parseFloat(e.target.value))}
+                        className="w-20 h-7 text-sm"
+                      />
+                    </div>
+                    <select
+                      value={card.condition}
+                      onChange={(e) => updateCard(i, 'condition', e.target.value)}
+                      className="text-xs border border-border rounded px-1 py-1 bg-background flex-shrink-0"
+                    >
+                      {['NM', 'LP', 'MP', 'HP', 'DMG'].map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                )
+              })}
             </div>
 
             <Button className="w-full" onClick={handleConfirm}>

@@ -17,8 +17,8 @@ export function parseCardList(text: string): ParsedCard[] {
     const line = rawLine.trim()
     if (!line || line.startsWith('//') || line.startsWith('#')) continue
 
-    // Formato con set y número: "4 Lightning Bolt (M11) 149"
-    const withSetMatch = line.match(/^(\d+)x?\s+(.+?)\s+\(([A-Z0-9]+)\)\s+(\d+)$/i)
+    // Formato con set y número: "4 Lightning Bolt (M11) 149" o "4 Counterspell (PLST) A25-50"
+    const withSetMatch = line.match(/^(\d+)x?\s+(.+?)\s+\(([A-Z0-9]+)\)\s+(\S+)$/i)
     if (withSetMatch) {
       cards.push({
         quantity: parseInt(withSetMatch[1]),
