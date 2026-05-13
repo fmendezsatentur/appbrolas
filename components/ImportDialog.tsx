@@ -18,6 +18,7 @@ export interface CardToPublish {
   priceRef?: number
   imageUrl?: string
   scryfallId?: string
+  colors?: string[]
   condition: string
   isFoil: boolean
   language: string
@@ -94,6 +95,7 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
             priceRef,
             imageUrl: getCardImageUrl(sf),
             scryfallId: sf.id,
+            colors: sf.color_identity ?? [],
             condition: 'NM',
             isFoil: false,
             language: 'en',

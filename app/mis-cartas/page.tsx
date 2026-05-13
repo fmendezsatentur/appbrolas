@@ -11,7 +11,7 @@ import { ImportDialog, type CardToPublish } from '@/components/ImportDialog'
 import { AddCardDialog, type CardFormData } from '@/components/AddCardDialog'
 import {
   Plus, Upload, Pencil, Trash2, ToggleLeft, ToggleRight,
-  Loader2, Check, X, ImageOff, ChevronDown, Square, CheckSquare,
+  Loader2, Check, X, ImageOff, ChevronDown, Square, CheckSquare, AlertTriangle,
 } from 'lucide-react'
 
 interface MyListing {
@@ -59,6 +59,7 @@ export default function MisCartasPage() {
   const [importOpen, setImportOpen] = React.useState(false)
   const [addOpen, setAddOpen] = React.useState(false)
   const [publishing, setPublishing] = React.useState(false)
+  const [hasPhone, setHasPhone] = React.useState<boolean | null>(null)
 
   // Inline edit state
   const [editingId, setEditingId] = React.useState<string | null>(null)
@@ -82,9 +83,16 @@ export default function MisCartasPage() {
     if (!session?.user?.id) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/cards?seller=${session.user.id}`)
-      const data = await res.json()
+      const [listingsRes, profileRes] = await Promise.all([
+        fetch(`/api/cards?seller=${session.user.id}`),
+        fetch('/api/profile'),
+      ])
+      const data = await listingsRes.json()
       setListings(data)
+      if (profileRes.ok) {
+        const profile = await profileRes.json()
+        setHasPhone(!!(profile.phone))
+      }
     } finally {
       setLoading(false)
     }
@@ -100,7 +108,10 @@ export default function MisCartasPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(card),
     })
-    if (!res.ok) throw new Error('Error publicando carta')
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error ?? 'Error publicando carta')
+    }
     toast.success(`${card.cardName} publicada`)
     await fetchMyListings()
   }
@@ -322,6 +333,17 @@ export default function MisCartasPage() {
             </Button>
           </div>
         </div>
+
+        {/* WhatsApp warning */}
+        {hasPhone === false && (
+          <div className="flex items-center gap-3 mb-6 p-4 rounded-lg border border-yellow-500/40 bg-yellow-500/10 text-sm">
+            <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0" />
+            <div className="flex-1">
+              <span className="font-medium text-yellow-400">Necesitás agregar tu número de WhatsApp antes de publicar cartas.</span>
+              {' '}Hacé click en tu nombre en la barra superior para abrirlo.
+            </div>
+          </div>
+        )}
 
         {/* Bulk action bar */}
         {selected.size > 0 && (

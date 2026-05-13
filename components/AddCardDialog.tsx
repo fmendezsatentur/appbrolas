@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 export interface CardFormData {
   cardName: string
@@ -19,6 +20,7 @@ export interface CardFormData {
   priceRef?: number
   imageUrl?: string
   scryfallId?: string
+  colors?: string[]
   language: string
   notes?: string
 }
@@ -32,6 +34,7 @@ interface PrintOption {
   imageUrl: string | null
   prices: { usd: string | null; usd_foil: string | null }
   released_at: string
+  colors: string[]
 }
 
 interface AddCardDialogProps {
@@ -114,6 +117,7 @@ export function AddCardDialog({ open, onOpenChange, onSave, initialData }: AddCa
         collectorNumber: selectedPrint.collector_number,
         imageUrl: selectedPrint.imageUrl ?? undefined,
         scryfallId: selectedPrint.id,
+        colors: selectedPrint.colors,
         priceRef: form.isFoil
           ? parseFloat(selectedPrint.prices.usd_foil ?? '0') || undefined
           : parseFloat(selectedPrint.prices.usd ?? '0') || undefined,
@@ -123,6 +127,8 @@ export function AddCardDialog({ open, onOpenChange, onSave, initialData }: AddCa
       })
       onOpenChange(false)
       resetDialog()
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Error publicando carta')
     } finally {
       setSaving(false)
     }

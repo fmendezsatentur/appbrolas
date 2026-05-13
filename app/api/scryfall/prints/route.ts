@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
       prices: card.prices,
       released_at: card.released_at,
       lang: card.lang,
+      colors: card.color_identity ?? [],
     }))
 
     return NextResponse.json({ data: prints })

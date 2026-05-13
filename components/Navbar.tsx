@@ -2,7 +2,8 @@
 import Link from 'next/link'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
-import { ShoppingCart, Package, LogOut, Sparkles, User } from 'lucide-react'
+import { ShoppingCart, Package, LogOut, User } from 'lucide-react'
+import Image from 'next/image'
 import { ProfileDialog } from '@/components/ProfileDialog'
 import * as React from 'react'
 
@@ -18,9 +19,9 @@ export function Navbar({ cartCount }: NavbarProps) {
     <>
       <nav className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-bold text-lg">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Magic Market
+          <Link href="/" className="flex items-center gap-2">
+            <Image src="/logo.png" alt="Magic Market" width={40} height={40} className="object-contain" />
+            <span className="font-bold text-lg hidden sm:inline">Magic Market</span>
           </Link>
 
           <div className="flex items-center gap-2">

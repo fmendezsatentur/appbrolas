@@ -72,6 +72,7 @@ model CardListing {
   priceRef        Float?
   imageUrl        String?
   scryfallId      String?
+  colors          String[] @default([])
   language        String   @default("en")
   notes           String?
   isActive        Boolean  @default(true)
