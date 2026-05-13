@@ -1,6 +1,7 @@
 'use client'
 import * as React from 'react'
 import { toast } from 'sonner'
+import { useSession } from 'next-auth/react'
 import { Navbar } from '@/components/Navbar'
 import { CardItem, type ListingWithUser } from '@/components/CardItem'
 import { Input } from '@/components/ui/input'
@@ -21,6 +22,7 @@ const COLORS = [
 type GroupedListing = ListingWithUser & { allIds: string[] }
 
 export default function MarketplacePage() {
+  const { data: session } = useSession()
   const [listings, setListings] = React.useState<ListingWithUser[]>([])
   const [loading, setLoading] = React.useState(true)
   const [search, setSearch] = React.useState('')
@@ -272,6 +274,7 @@ export default function MarketplacePage() {
                 listing={listing}
                 onAddToCart={addToCart}
                 isInCart={cartItemIds.has(listing.id)}
+                isSelf={!!session?.user?.id && listing.user.id === session.user.id}
               />
             ))}
           </div>

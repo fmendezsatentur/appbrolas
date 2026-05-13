@@ -46,9 +46,10 @@ interface CardItemProps {
   listing: ListingWithUser
   onAddToCart: (listing: ListingWithUser) => void
   isInCart: boolean
+  isSelf?: boolean
 }
 
-export function CardItem({ listing, onAddToCart, isInCart }: CardItemProps) {
+export function CardItem({ listing, onAddToCart, isInCart, isSelf }: CardItemProps) {
   const discount =
     listing.priceRef && listing.price < listing.priceRef
       ? Math.round(((listing.priceRef - listing.price) / listing.priceRef) * 100)
@@ -124,12 +125,12 @@ export function CardItem({ listing, onAddToCart, isInCart }: CardItemProps) {
           <Button
             size="sm"
             className="w-full gap-2 mt-1"
-            variant={isInCart ? 'secondary' : 'default'}
-            onClick={() => onAddToCart(listing)}
-            disabled={listing.quantity === 0}
+            variant={isSelf ? 'outline' : isInCart ? 'secondary' : 'default'}
+            onClick={() => !isSelf && onAddToCart(listing)}
+            disabled={listing.quantity === 0 || isSelf}
           >
             <ShoppingCart className="h-3.5 w-3.5" />
-            {isInCart ? 'En carrito' : 'Agregar'}
+            {isSelf ? 'Tu carta' : isInCart ? 'En carrito' : 'Agregar'}
           </Button>
         </div>
       </div>

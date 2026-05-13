@@ -32,8 +32,21 @@ export default function CarritoPage() {
     toast.success('Carta removida del carrito')
   }
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (cart.length === 0) return
+
+    // Pausar las publicaciones compradas
+    const listingIds = cart.map((i) => i.listingId)
+    try {
+      await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listingIds }),
+      })
+    } catch { /* no bloquear si falla */ }
+
+    // Limpiar carrito
+    syncCart([])
 
     // Agrupar por vendedor
     const bySeller: Record<string, { items: CartItem[]; phone: string | null }> = {}
@@ -44,10 +57,8 @@ export default function CarritoPage() {
       bySeller[item.sellerName].items.push(item)
     }
 
-    const sellers = Object.entries(bySeller)
-
     // Un mensaje de WhatsApp por vendedor
-    for (const [sellerName, { items, phone }] of sellers) {
+    for (const [sellerName, { items, phone }] of Object.entries(bySeller)) {
       const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0)
       const lines = items
         .map((i) => `• ${i.quantity}x ${i.name} (${i.condition}${i.isFoil ? ' Foil' : ''}) — $${(i.price * i.quantity).toFixed(2)}`)
@@ -57,7 +68,6 @@ export default function CarritoPage() {
         `Hola ${sellerName}! Quiero comprar estas cartas de Magic Market:\n\n${lines}\n\nSubtotal: $${subtotal.toFixed(2)}\n\n¿Las tenés disponibles?`
       )
 
-      // Si tiene número, abre WhatsApp directo. Si no, abre con texto para que elija.
       const url = phone
         ? `https://wa.me/${phone.replace(/\D/g, '')}?text=${msg}`
         : `https://wa.me/?text=${msg}`

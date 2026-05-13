@@ -36,13 +36,24 @@ export async function POST(request: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { phone: true },
+    select: { phone: true, email: true },
   })
   if (!user?.phone) {
     return NextResponse.json(
       { error: 'Necesitás agregar tu número de WhatsApp en tu perfil antes de publicar cartas.' },
       { status: 400 }
     )
+  }
+
+  const ADMIN_EMAIL = 'fmendezsatentur@gmail.com'
+  if (user.email !== ADMIN_EMAIL) {
+    const count = await prisma.cardListing.count({ where: { userId: session.user.id } })
+    if (count >= 50) {
+      return NextResponse.json(
+        { error: 'Límite de 50 cartas por usuario. Eliminá alguna antes de publicar más.' },
+        { status: 400 }
+      )
+    }
   }
 
   const body = await request.json()
