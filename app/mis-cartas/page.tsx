@@ -11,10 +11,13 @@ import { ImportDialog, type CardToPublish } from '@/components/ImportDialog'
 import { AddCardDialog, type CardFormData } from '@/components/AddCardDialog'
 import { AddSealedDialog, type SealedFormData } from '@/components/AddSealedDialog'
 import { type SealedListingWithUser } from '@/components/SealedItem'
+import AddAuctionDialog from '@/components/AddAuctionDialog'
+import { type AuctionWithMeta } from '@/components/AuctionCard'
+import Link from 'next/link'
 import {
   Plus, Upload, Pencil, Trash2, ToggleLeft, ToggleRight,
   Loader2, Check, X, ImageOff, ChevronDown, Square, CheckSquare, AlertTriangle, Package,
-  ShoppingBag, TrendingUp, Clock, CheckCircle2, XCircle,
+  ShoppingBag, TrendingUp, Clock, CheckCircle2, XCircle, Gavel,
 } from 'lucide-react'
 
 interface Order {
@@ -85,10 +88,14 @@ export default function MisCartasPage() {
   const [addSealedOpen, setAddSealedOpen] = React.useState(false)
 
   // Orders state
-  const [pageTab, setPageTab] = React.useState<'cards' | 'sales' | 'purchases'>('cards')
+  const [pageTab, setPageTab] = React.useState<'cards' | 'sealed' | 'auctions' | 'sales' | 'purchases'>('cards')
   const [sales, setSales] = React.useState<Order[]>([])
   const [purchases, setPurchases] = React.useState<Order[]>([])
   const [loadingOrders, setLoadingOrders] = React.useState(false)
+
+  // My auctions
+  const [myAuctions, setMyAuctions] = React.useState<AuctionWithMeta[]>([])
+  const [loadingAuctions, setLoadingAuctions] = React.useState(false)
 
   // Inline edit state
   const [editingId, setEditingId] = React.useState<string | null>(null)
@@ -197,7 +204,33 @@ export default function MisCartasPage() {
     if ((pageTab === 'sales' || pageTab === 'purchases') && sales.length === 0 && purchases.length === 0) {
       fetchOrders()
     }
+    if (pageTab === 'auctions') {
+      fetchMyAuctions()
+    }
   }, [pageTab])
+
+  const fetchMyAuctions = async () => {
+    if (!session?.user?.id) return
+    setLoadingAuctions(true)
+    try {
+      const res = await fetch(`/api/auctions?seller=${session.user.id}`)
+      if (res.ok) setMyAuctions(await res.json())
+    } finally {
+      setLoadingAuctions(false)
+    }
+  }
+
+  const deleteAuction = async (id: string, title: string) => {
+    if (!confirm(`¿Eliminar la subasta "${title}"?`)) return
+    const res = await fetch(`/api/auctions/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      toast.success('Subasta eliminada')
+      setMyAuctions((prev) => prev.filter((a) => a.id !== id))
+    } else {
+      const data = await res.json().catch(() => ({}))
+      toast.error(data.error ?? 'No se pudo eliminar')
+    }
+  }
 
   const updateOrderStatus = async (orderId: string, status: 'completed' | 'cancelled') => {
     const res = await fetch(`/api/orders/${orderId}`, {
@@ -422,33 +455,42 @@ export default function MisCartasPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => setImportOpen(true)} disabled={publishing}>
-              {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              Importar Moxfield
-            </Button>
-            <Button variant="outline" className="gap-2" onClick={() => setAddOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Agregar carta
-            </Button>
-            <Button className="gap-2" onClick={() => setAddSealedOpen(true)}>
-              <Package className="h-4 w-4" />
-              Publicar sellado
-            </Button>
+            {pageTab === 'cards' && (<>
+              <Button variant="outline" className="gap-2" onClick={() => setImportOpen(true)} disabled={publishing}>
+                {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                Importar Moxfield
+              </Button>
+              <Button variant="outline" className="gap-2" onClick={() => setAddOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Agregar carta
+              </Button>
+            </>)}
+            {pageTab === 'sealed' && (
+              <Button className="gap-2" onClick={() => setAddSealedOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Publicar sellado
+              </Button>
+            )}
+            {pageTab === 'auctions' && (
+              <AddAuctionDialog onCreated={fetchMyAuctions} />
+            )}
           </div>
         </div>
 
         {/* Page tabs */}
-        <div className="flex items-center gap-1 mb-6 border-b border-border">
+        <div className="flex items-center gap-1 mb-6 border-b border-border overflow-x-auto">
           {[
-            { key: 'cards', label: 'Mis cartas', icon: <Package className="h-4 w-4" /> },
-            { key: 'sales', label: `Ventas${sales.length ? ` (${sales.length})` : ''}`, icon: <TrendingUp className="h-4 w-4" /> },
+            { key: 'cards',     label: 'Mis cartas', icon: <Package className="h-4 w-4" /> },
+            { key: 'sealed',    label: `Sellado${sealedListings.length ? ` (${sealedListings.length})` : ''}`, icon: <Package className="h-4 w-4" /> },
+            { key: 'auctions',  label: `Subastas${myAuctions.length ? ` (${myAuctions.length})` : ''}`, icon: <Gavel className="h-4 w-4" /> },
+            { key: 'sales',     label: `Ventas${sales.length ? ` (${sales.length})` : ''}`, icon: <TrendingUp className="h-4 w-4" /> },
             { key: 'purchases', label: `Compras${purchases.length ? ` (${purchases.length})` : ''}`, icon: <ShoppingBag className="h-4 w-4" /> },
           ].map(({ key, label, icon }) => (
             <button
               key={key}
               type="button"
-              onClick={() => setPageTab(key as any)}
-              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              onClick={() => setPageTab(key as 'cards' | 'sealed' | 'auctions' | 'sales' | 'purchases')}
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 pageTab === key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -470,6 +512,105 @@ export default function MisCartasPage() {
         {/* PURCHASES TAB */}
         {pageTab === 'purchases' && (
           <OrderList orders={purchases} role="buyer" loading={loadingOrders} />
+        )}
+
+        {/* SEALED TAB */}
+        {pageTab === 'sealed' && (
+          sealedListings.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground border border-dashed border-border rounded-xl">
+              <Package className="h-8 w-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No tenés productos sellados publicados</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {sealedListings.map((listing) => (
+                <div key={listing.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${listing.isActive ? 'border-border bg-card' : 'border-border/50 bg-card/50 opacity-60'}`}>
+                  {listing.imageUrl ? (
+                    <img src={listing.imageUrl} alt={listing.title} className="w-10 h-14 object-cover rounded flex-shrink-0" />
+                  ) : (
+                    <div className="w-10 h-14 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm truncate">{listing.title}</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded border border-border bg-muted text-muted-foreground flex-shrink-0">{listing.tag}</span>
+                    </div>
+                    {listing.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{listing.description}</p>
+                    )}
+                  </div>
+                  <div className="font-bold flex-shrink-0">${listing.price.toFixed(2)}</div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleSealedActive(listing.id, listing.isActive)} title={listing.isActive ? 'Pausar' : 'Activar'}>
+                      {listing.isActive ? <ToggleRight className="h-4 w-4 text-primary" /> : <ToggleLeft className="h-4 w-4" />}
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => deleteSealed(listing.id, listing.title)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {/* AUCTIONS TAB */}
+        {pageTab === 'auctions' && (
+          loadingAuctions ? (
+            <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : myAuctions.length === 0 ? (
+            <div className="text-center py-20 text-muted-foreground border border-dashed border-border rounded-xl">
+              <Gavel className="h-8 w-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No tenés subastas creadas</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {myAuctions.map((auction) => {
+                const ended = auction.status === 'ended'
+                const canDelete = !ended && auction._count.bids === 0
+                return (
+                  <div key={auction.id} className={`flex items-center gap-3 p-3 rounded-xl border ${ended ? 'border-border/50 bg-card/50 opacity-70' : 'border-border bg-card'}`}>
+                    {auction.imageUrl ? (
+                      <img src={auction.imageUrl} alt={auction.title} className="w-10 h-14 object-contain rounded flex-shrink-0" />
+                    ) : (
+                      <div className="w-10 h-14 rounded bg-muted flex items-center justify-center text-xl flex-shrink-0">🔨</div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Link href={`/subastas/${auction.id}`} className="font-semibold text-sm hover:underline truncate">{auction.title}</Link>
+                        {ended ? (
+                          <span className="text-xs px-1.5 py-0.5 rounded border border-border bg-muted text-muted-foreground">Finalizada</span>
+                        ) : (
+                          <span className="text-xs px-1.5 py-0.5 rounded border border-green-500/30 bg-green-500/10 text-green-400">Activa</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {auction._count.bids} {auction._count.bids === 1 ? 'oferta' : 'ofertas'} · Precio actual: ${auction.currentPrice.toLocaleString('es-AR')}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {ended ? 'Cerró' : 'Cierra'}: {new Date(auction.endTime).toLocaleString('es-AR')}
+                      </p>
+                    </div>
+                    {ended && auction.winner && (
+                      <div className="text-xs text-green-400 font-medium flex-shrink-0">
+                        Ganador: {auction.winner.name}
+                      </div>
+                    )}
+                    {canDelete && (
+                      <Button
+                        variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive flex-shrink-0"
+                        onClick={() => deleteAuction(auction.id, auction.title)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )
         )}
 
         {pageTab === 'cards' && (<>
@@ -738,57 +879,6 @@ export default function MisCartasPage() {
 
         </>)}
 
-        {/* Sealed section */}
-        <div className="mt-10">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-xl font-bold">Material sellado</h2>
-              <p className="text-muted-foreground text-sm">{sealedListings.length} publicaciones</p>
-            </div>
-            <Button className="gap-2" size="sm" onClick={() => setAddSealedOpen(true)}>
-              <Plus className="h-4 w-4" /> Agregar
-            </Button>
-          </div>
-
-          {sealedListings.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground border border-dashed border-border rounded-xl">
-              <Package className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No tenés productos sellados publicados</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {sealedListings.map((listing) => (
-                <div key={listing.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${listing.isActive ? 'border-border bg-card' : 'border-border/50 bg-card/50 opacity-60'}`}>
-                  {listing.imageUrl ? (
-                    <img src={listing.imageUrl} alt={listing.title} className="w-10 h-14 object-cover rounded flex-shrink-0" />
-                  ) : (
-                    <div className="w-10 h-14 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                      <Package className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm truncate">{listing.title}</span>
-                      <span className="text-xs px-1.5 py-0.5 rounded border border-border bg-muted text-muted-foreground flex-shrink-0">{listing.tag}</span>
-                    </div>
-                    {listing.description && (
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{listing.description}</p>
-                    )}
-                  </div>
-                  <div className="font-bold flex-shrink-0">${listing.price.toFixed(2)}</div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleSealedActive(listing.id, listing.isActive)} title={listing.isActive ? 'Pausar' : 'Activar'}>
-                      {listing.isActive ? <ToggleRight className="h-4 w-4 text-primary" /> : <ToggleLeft className="h-4 w-4" />}
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => deleteSealed(listing.id, listing.title)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </main>
 
       <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImport={handleImport} />

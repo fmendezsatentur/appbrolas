@@ -20,6 +20,9 @@ model User {
   sealedListings  SealedListing[]
   ordersAsBuyer   Order[]         @relation("OrderBuyer")
   ordersAsSeller  Order[]         @relation("OrderSeller")
+  auctionsOwned   Auction[]       @relation("AuctionOwner")
+  auctionsWon     Auction[]       @relation("AuctionWinner")
+  bids            Bid[]
   createdAt       DateTime        @default(now())
   updatedAt     DateTime      @updatedAt
 }
@@ -58,6 +61,42 @@ model VerificationToken {
   expires    DateTime
 
   @@id([identifier, token])
+}
+
+model Auction {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation("AuctionOwner", fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  imageUrl      String?
+  startingPrice Float
+  currentPrice  Float
+  minIncrement  Float    @default(1)
+  endTime       DateTime
+  status        String   @default("active")
+  winnerId      String?
+  winner        User?    @relation("AuctionWinner", fields: [winnerId], references: [id])
+  bids          Bid[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([endTime])
+}
+
+model Bid {
+  id        String   @id @default(cuid())
+  auctionId String
+  auction   Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  amount    Float
+  createdAt DateTime @default(now())
+
+  @@index([auctionId])
+  @@index([userId])
 }
 
 model Order {

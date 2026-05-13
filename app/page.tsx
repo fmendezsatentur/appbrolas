@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { Navbar } from '@/components/Navbar'
 import { CardItem, type ListingWithUser } from '@/components/CardItem'
 import { SealedItem, type SealedListingWithUser } from '@/components/SealedItem'
+import AuctionCard, { type AuctionWithMeta } from '@/components/AuctionCard'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Search, X, ArrowUpDown } from 'lucide-react'
@@ -21,12 +22,19 @@ const COLORS = [
 ]
 
 type GroupedListing = ListingWithUser & { allIds: string[] }
-type Tab = 'cards' | 'sealed'
+type Tab = 'cards' | 'sealed' | 'auctions'
 type Sort = 'newest' | 'price_asc' | 'price_desc'
 
 export default function MarketplacePage() {
   const { data: session } = useSession()
-  const [tab, setTab] = React.useState<Tab>('cards')
+  const [tab, setTab] = React.useState<Tab>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search).get('tab')
+      if (p === 'subastas') return 'auctions'
+      if (p === 'sealed') return 'sealed'
+    }
+    return 'cards'
+  })
   const [sort, setSort] = React.useState<Sort>('newest')
 
   // Card filters
@@ -44,6 +52,11 @@ export default function MarketplacePage() {
   const [sealed, setSealed] = React.useState<SealedListingWithUser[]>([])
   const [loadingSealed, setLoadingSealed] = React.useState(false)
   const [sealedTag, setSealedTag] = React.useState<string | null>(null)
+
+  // Auctions
+  const [auctions, setAuctions] = React.useState<AuctionWithMeta[]>([])
+  const [loadingAuctions, setLoadingAuctions] = React.useState(false)
+  const [auctionStatus, setAuctionStatus] = React.useState<'active' | 'ended'>('active')
 
   const fetchSuggestions = (q: string) => {
     if (suggestDebounce.current) clearTimeout(suggestDebounce.current)
@@ -106,6 +119,22 @@ export default function MarketplacePage() {
     const t = setTimeout(fetchSealed, 300)
     return () => clearTimeout(t)
   }, [fetchSealed])
+
+  // Fetch auctions
+  const fetchAuctions = React.useCallback(async () => {
+    setLoadingAuctions(true)
+    try {
+      const res = await fetch(`/api/auctions?status=${auctionStatus}`)
+      setAuctions(await res.json())
+    } finally { setLoadingAuctions(false) }
+  }, [auctionStatus])
+
+  React.useEffect(() => {
+    if (tab === 'auctions') {
+      const t = setTimeout(fetchAuctions, 300)
+      return () => clearTimeout(t)
+    }
+  }, [fetchAuctions, tab])
 
   // Group duplicate card listings
   const grouped: GroupedListing[] = React.useMemo(() => {
@@ -188,6 +217,16 @@ export default function MarketplacePage() {
           >
             Material sellado
             {!loadingSealed && <span className="ml-2 text-xs text-muted-foreground">({sealed.length})</span>}
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('auctions')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              tab === 'auctions' ? 'border-yellow-400 text-yellow-400' : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            🔨 Subastas
+            {!loadingAuctions && tab === 'auctions' && <span className="ml-2 text-xs text-muted-foreground">({auctions.length})</span>}
           </button>
 
           {/* Sort — right aligned */}
@@ -280,6 +319,43 @@ export default function MarketplacePage() {
                 {grouped.map((listing) => (
                   <CardItem key={listing.id} listing={listing} onAddToCart={addToCart} isInCart={cartItemIds.has(listing.id)} isSelf={!!session?.user?.id && listing.user.id === session.user.id} />
                 ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* AUCTIONS TAB */}
+        {tab === 'auctions' && (
+          <>
+            <div className="flex items-center gap-2 mb-6">
+              <button
+                type="button"
+                onClick={() => setAuctionStatus('active')}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${auctionStatus === 'active' ? 'bg-yellow-500 border-yellow-500 text-black' : 'border-zinc-600 text-zinc-400 hover:text-white'}`}
+              >
+                Activas
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuctionStatus('ended')}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${auctionStatus === 'ended' ? 'bg-zinc-600 border-zinc-600 text-white' : 'border-zinc-600 text-zinc-400 hover:text-white'}`}
+              >
+                Finalizadas
+              </button>
+            </div>
+
+            {loadingAuctions ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {Array.from({ length: 8 }).map((_, i) => <div key={i} className="aspect-[4/3] rounded-xl bg-muted/50 animate-pulse" />)}
+              </div>
+            ) : auctions.length === 0 ? (
+              <div className="text-center py-20 text-muted-foreground">
+                <p className="text-lg">No hay subastas {auctionStatus === 'active' ? 'activas' : 'finalizadas'}</p>
+                <p className="text-sm mt-1">¡Sé el primero en crear una subasta!</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {auctions.map((a) => <AuctionCard key={a.id} auction={a} />)}
               </div>
             )}
           </>
