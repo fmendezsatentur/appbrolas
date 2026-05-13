@@ -35,6 +35,7 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
   const [text, setText] = React.useState('')
   const [url, setUrl] = React.useState('')
   const [loading, setLoading] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
   const [parsed, setParsed] = React.useState<ParsedCard[]>([])
   const [enriched, setEnriched] = React.useState<CardToPublish[]>([])
   const [step, setStep] = React.useState<'input' | 'review'>('input')
@@ -42,6 +43,7 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
 
   const handleParse = async () => {
     setLoading(true)
+    setError(null)
     try {
       const res = await fetch('/api/moxfield', {
         method: 'POST',
@@ -49,10 +51,16 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
         body: JSON.stringify(tab === 'text' ? { text } : { url }),
       })
       const data = await res.json()
-      if (data.cards) {
+      if (data.cards && data.cards.length > 0) {
         setParsed(data.cards)
         await enrichCards(data.cards)
+      } else if (data.error) {
+        setError(data.error)
+      } else {
+        setError('No se encontraron cartas. Verificá el formato.')
       }
+    } catch {
+      setError('Error de conexión. Intentá de nuevo.')
     } finally {
       setLoading(false)
     }
@@ -132,59 +140,36 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
         <DialogHeader>
           <DialogTitle>Importar desde Moxfield</DialogTitle>
           <DialogDescription>
-            Pegá el texto exportado de tu deck o la URL pública del deck en Moxfield.
+            En Moxfield abrí tu deck → <strong>Export → Text</strong>, copiás todo y lo pegás acá.
           </DialogDescription>
         </DialogHeader>
 
         {step === 'input' && (
           <div className="space-y-4">
-            <div className="flex gap-2">
-              <Button
-                variant={tab === 'text' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTab('text')}
-              >
-                Texto
-              </Button>
-              <Button
-                variant={tab === 'url' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTab('url')}
-              >
-                URL de Moxfield
-              </Button>
+            <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground">¿Cómo exportar de Moxfield?</p>
+              <p>1. Abrí tu deck en moxfield.com</p>
+              <p>2. Hacé click en <strong>Export</strong> (arriba a la derecha)</p>
+              <p>3. Elegí <strong>Text</strong> o <strong>MTGO</strong></p>
+              <p>4. Copiás todo y lo pegás abajo</p>
             </div>
 
-            {tab === 'text' ? (
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  En Moxfield: Export → Text o MTGO. Formato: <code>4 Lightning Bolt</code>
-                </p>
-                <Textarea
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="4 Lightning Bolt&#10;2 Island&#10;1 Black Lotus"
-                  className="font-mono text-sm"
-                  rows={10}
-                />
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  El deck debe ser público en Moxfield.
-                </p>
-                <Input
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://www.moxfield.com/decks/..."
-                />
-              </div>
+            <Textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={"4 Lightning Bolt\n2 Island\n1 Black Lotus (LEA) 4"}
+              className="font-mono text-sm"
+              rows={10}
+            />
+
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
             )}
 
             <Button
               className="w-full gap-2"
               onClick={handleParse}
-              disabled={loading || (tab === 'text' ? !text.trim() : !url.trim())}
+              disabled={loading || !text.trim()}
             >
               {loading ? (
                 <>
