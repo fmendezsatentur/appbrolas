@@ -14,7 +14,24 @@ import { type SealedListingWithUser } from '@/components/SealedItem'
 import {
   Plus, Upload, Pencil, Trash2, ToggleLeft, ToggleRight,
   Loader2, Check, X, ImageOff, ChevronDown, Square, CheckSquare, AlertTriangle, Package,
+  ShoppingBag, TrendingUp, Clock, CheckCircle2, XCircle,
 } from 'lucide-react'
+
+interface Order {
+  id: string
+  listingId: string
+  cardName: string
+  setName: string | null
+  imageUrl: string | null
+  quantity: number
+  price: number
+  condition: string
+  isFoil: boolean
+  status: 'pending' | 'completed' | 'cancelled'
+  createdAt: string
+  buyer: { id: string; name: string | null; image: string | null; phone: string | null }
+  seller: { id: string; name: string | null; image: string | null; phone: string | null }
+}
 
 interface MyListing {
   id: string
@@ -66,6 +83,12 @@ export default function MisCartasPage() {
   // Sealed state
   const [sealedListings, setSealedListings] = React.useState<SealedListingWithUser[]>([])
   const [addSealedOpen, setAddSealedOpen] = React.useState(false)
+
+  // Orders state
+  const [pageTab, setPageTab] = React.useState<'cards' | 'sales' | 'purchases'>('cards')
+  const [sales, setSales] = React.useState<Order[]>([])
+  const [purchases, setPurchases] = React.useState<Order[]>([])
+  const [loadingOrders, setLoadingOrders] = React.useState(false)
 
   // Inline edit state
   const [editingId, setEditingId] = React.useState<string | null>(null)
@@ -154,6 +177,42 @@ export default function MisCartasPage() {
       body: JSON.stringify({ isActive: !isActive }),
     })
     setSealedListings((prev) => prev.map((l) => l.id === id ? { ...l, isActive: !isActive } : l))
+  }
+
+  const fetchOrders = async () => {
+    setLoadingOrders(true)
+    try {
+      const [salesRes, purchasesRes] = await Promise.all([
+        fetch('/api/orders?role=seller'),
+        fetch('/api/orders?role=buyer'),
+      ])
+      if (salesRes.ok) setSales(await salesRes.json())
+      if (purchasesRes.ok) setPurchases(await purchasesRes.json())
+    } finally {
+      setLoadingOrders(false)
+    }
+  }
+
+  React.useEffect(() => {
+    if ((pageTab === 'sales' || pageTab === 'purchases') && sales.length === 0 && purchases.length === 0) {
+      fetchOrders()
+    }
+  }, [pageTab])
+
+  const updateOrderStatus = async (orderId: string, status: 'completed' | 'cancelled') => {
+    const res = await fetch(`/api/orders/${orderId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    })
+    if (!res.ok) { toast.error('Error al actualizar'); return }
+    setSales((prev) => prev.map((o) => o.id === orderId ? { ...o, status } : o))
+    if (status === 'cancelled') {
+      toast.success('Venta cancelada — carta reactivada')
+      await fetchMyListings()
+    } else {
+      toast.success('Venta confirmada')
+    }
   }
 
   const handleImport = async (cards: CardToPublish[]) => {
@@ -378,6 +437,43 @@ export default function MisCartasPage() {
           </div>
         </div>
 
+        {/* Page tabs */}
+        <div className="flex items-center gap-1 mb-6 border-b border-border">
+          {[
+            { key: 'cards', label: 'Mis cartas', icon: <Package className="h-4 w-4" /> },
+            { key: 'sales', label: `Ventas${sales.length ? ` (${sales.length})` : ''}`, icon: <TrendingUp className="h-4 w-4" /> },
+            { key: 'purchases', label: `Compras${purchases.length ? ` (${purchases.length})` : ''}`, icon: <ShoppingBag className="h-4 w-4" /> },
+          ].map(({ key, label, icon }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setPageTab(key as any)}
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                pageTab === key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {icon}{label}
+            </button>
+          ))}
+        </div>
+
+        {/* SALES TAB */}
+        {pageTab === 'sales' && (
+          <OrderList
+            orders={sales}
+            role="seller"
+            loading={loadingOrders}
+            onUpdateStatus={updateOrderStatus}
+          />
+        )}
+
+        {/* PURCHASES TAB */}
+        {pageTab === 'purchases' && (
+          <OrderList orders={purchases} role="buyer" loading={loadingOrders} />
+        )}
+
+        {pageTab === 'cards' && (<>
+
         {/* WhatsApp warning */}
         {hasPhone === false && (
           <div className="flex items-center gap-3 mb-6 p-4 rounded-lg border border-yellow-500/40 bg-yellow-500/10 text-sm">
@@ -484,6 +580,7 @@ export default function MisCartasPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-sm">{listing.cardName}</span>
                           {listing.isFoil && <Badge variant="secondary" className="text-xs">Foil</Badge>}
+                          {!listing.isActive && <span className="text-xs px-1.5 py-0.5 rounded border border-yellow-500/30 bg-yellow-500/10 text-yellow-400">Pausada</span>}
                         </div>
                         <div className="text-xs text-muted-foreground mt-0.5">
                           {listing.setName ?? '—'} · {listing.condition} · x{listing.quantity} · {listing.language.toUpperCase()}
@@ -639,6 +736,8 @@ export default function MisCartasPage() {
           </>
         )}
 
+        </>)}
+
         {/* Sealed section */}
         <div className="mt-10">
           <div className="flex items-center justify-between mb-4">
@@ -695,6 +794,144 @@ export default function MisCartasPage() {
       <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImport={handleImport} />
       <AddCardDialog open={addOpen} onOpenChange={setAddOpen} onSave={publishCard} />
       <AddSealedDialog open={addSealedOpen} onOpenChange={setAddSealedOpen} onSave={publishSealed} />
+    </div>
+  )
+}
+
+// ─── OrderList sub-component ────────────────────────────────────────────────
+
+const STATUS_STYLES = {
+  pending:   { label: 'Pendiente',  icon: <Clock className="h-3.5 w-3.5" />,        cls: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' },
+  completed: { label: 'Concretada', icon: <CheckCircle2 className="h-3.5 w-3.5" />, cls: 'bg-green-500/10 text-green-400 border-green-500/30' },
+  cancelled: { label: 'Cancelada',  icon: <XCircle className="h-3.5 w-3.5" />,      cls: 'bg-red-500/10 text-red-400 border-red-500/30' },
+}
+
+function OrderList({
+  orders,
+  role,
+  loading,
+  onUpdateStatus,
+}: {
+  orders: Order[]
+  role: 'seller' | 'buyer'
+  loading: boolean
+  onUpdateStatus?: (id: string, status: 'completed' | 'cancelled') => void
+}) {
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+
+  const pending   = orders.filter((o) => o.status === 'pending')
+  const completed = orders.filter((o) => o.status === 'completed')
+  const cancelled = orders.filter((o) => o.status === 'cancelled')
+
+  const totalSold  = completed.reduce((s, o) => s + o.price * o.quantity, 0)
+  const totalSpent = role === 'buyer' ? completed.reduce((s, o) => s + o.price * o.quantity, 0) : 0
+
+  if (orders.length === 0) {
+    return (
+      <div className="text-center py-20 text-muted-foreground">
+        <p>{role === 'seller' ? 'Todavía no recibiste ningún pedido.' : 'Todavía no hiciste ninguna compra.'}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Summary */}
+      {role === 'seller' && completed.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-lg border border-border bg-card p-3 text-center">
+            <p className="text-2xl font-bold">{orders.length}</p>
+            <p className="text-xs text-muted-foreground">pedidos totales</p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-3 text-center">
+            <p className="text-2xl font-bold text-green-400">${totalSold.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground">vendido</p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-3 text-center">
+            <p className="text-2xl font-bold">{completed.length}</p>
+            <p className="text-xs text-muted-foreground">concretadas</p>
+          </div>
+        </div>
+      )}
+
+      {/* Order rows */}
+      {[
+        { group: pending,   title: 'Pendientes' },
+        { group: completed, title: 'Concretadas' },
+        { group: cancelled, title: 'Canceladas' },
+      ].filter(({ group }) => group.length > 0).map(({ group, title }) => (
+        <div key={title}>
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">{title}</h3>
+          <div className="space-y-2">
+            {group.map((order) => {
+              const s = STATUS_STYLES[order.status as keyof typeof STATUS_STYLES]
+              const counterpart = role === 'seller' ? order.buyer : order.seller
+              return (
+                <div key={order.id} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card">
+                  {order.imageUrl ? (
+                    <img src={order.imageUrl} alt={order.cardName} className="w-10 h-14 object-cover rounded flex-shrink-0" />
+                  ) : (
+                    <div className="w-10 h-14 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                      <ImageOff className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate">{order.cardName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {order.setName} · {order.condition}{order.isFoil ? ' Foil' : ''} · x{order.quantity}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {role === 'seller' ? 'Comprador' : 'Vendedor'}: <span className="text-foreground">{counterpart.name}</span>
+                      {counterpart.phone && (
+                        <a
+                          href={`https://wa.me/${counterpart.phone.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-2 text-green-400 hover:text-green-300"
+                        >
+                          WhatsApp
+                        </a>
+                      )}
+                    </p>
+                  </div>
+
+                  <div className="text-right flex-shrink-0">
+                    <p className="font-bold">${(order.price * order.quantity).toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleDateString('es-AR')}</p>
+                  </div>
+
+                  <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded border font-medium flex-shrink-0 ${s.cls}`}>
+                    {s.icon} {s.label}
+                  </div>
+
+                  {/* Seller actions for pending orders */}
+                  {role === 'seller' && order.status === 'pending' && onUpdateStatus && (
+                    <div className="flex gap-1 flex-shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs gap-1 text-green-400 border-green-500/30 hover:bg-green-500/10"
+                        onClick={() => onUpdateStatus(order.id, 'completed')}
+                      >
+                        <CheckCircle2 className="h-3 w-3" /> Confirmar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs gap-1 text-red-400 border-red-500/30 hover:bg-red-500/10"
+                        onClick={() => onUpdateStatus(order.id, 'cancelled')}
+                      >
+                        <XCircle className="h-3 w-3" /> Cancelar
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

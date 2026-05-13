@@ -13,12 +13,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  // Pause listings that belong to OTHER users (not the buyer's own)
-  await prisma.cardListing.updateMany({
+  // Fetch listings to get seller info for order records
+  const listings = await prisma.cardListing.findMany({
     where: {
       id: { in: listingIds },
-      userId: { not: session.user.id },
+      userId: { not: session.user.id }, // can't buy from yourself
     },
+  })
+
+  if (listings.length === 0) return NextResponse.json({ ok: true })
+
+  // Create one Order per listing item
+  await prisma.order.createMany({
+    data: listings.map((l) => ({
+      buyerId: session.user.id,
+      sellerId: l.userId,
+      listingId: l.id,
+      cardName: l.cardName,
+      setName: l.setName ?? undefined,
+      imageUrl: l.imageUrl ?? undefined,
+      quantity: l.quantity,
+      price: l.price,
+      condition: l.condition,
+      isFoil: l.isFoil,
+      status: 'pending',
+    })),
+  })
+
+  // Pause the listings
+  await prisma.cardListing.updateMany({
+    where: { id: { in: listings.map((l) => l.id) } },
     data: { isActive: false },
   })
 

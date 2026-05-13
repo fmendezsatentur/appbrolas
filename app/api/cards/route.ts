@@ -11,6 +11,10 @@ export async function GET(request: NextRequest) {
   const color = searchParams.get('color')
   const sort = searchParams.get('sort') ?? 'newest'
 
+  // When fetching own listings, skip isActive filter so paused listings are visible
+  const session = await auth()
+  const isOwnListings = !!(seller && seller === session?.user?.id)
+
   const orderBy =
     sort === 'price_asc'  ? { price: 'asc' as const } :
     sort === 'price_desc' ? { price: 'desc' as const } :
@@ -18,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   const listings = await prisma.cardListing.findMany({
     where: {
-      isActive: true,
+      ...(!isOwnListings && { isActive: true }),
       ...(search && { cardName: { contains: search, mode: 'insensitive' } }),
       ...(seller && { userId: seller }),
       ...(sellerName && { user: { name: { contains: sellerName, mode: 'insensitive' } } }),

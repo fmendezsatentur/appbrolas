@@ -14,11 +14,13 @@ model User {
   emailVerified DateTime?
   image         String?
   phone         String?
-  accounts      Account[]
-  sessions      Session[]
-  listings      CardListing[]
-  sealedListings SealedListing[]
-  createdAt     DateTime      @default(now())
+  accounts        Account[]
+  sessions        Session[]
+  listings        CardListing[]
+  sealedListings  SealedListing[]
+  ordersAsBuyer   Order[]         @relation("OrderBuyer")
+  ordersAsSeller  Order[]         @relation("OrderSeller")
+  createdAt       DateTime        @default(now())
   updatedAt     DateTime      @updatedAt
 }
 
@@ -56,6 +58,28 @@ model VerificationToken {
   expires    DateTime
 
   @@id([identifier, token])
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  buyerId     String
+  buyer       User     @relation("OrderBuyer", fields: [buyerId], references: [id])
+  sellerId    String
+  seller      User     @relation("OrderSeller", fields: [sellerId], references: [id])
+  listingId   String
+  cardName    String
+  setName     String?
+  imageUrl    String?
+  quantity    Int
+  price       Float
+  condition   String   @default("NM")
+  isFoil      Boolean  @default(false)
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([buyerId])
+  @@index([sellerId])
 }
 
 model SealedListing {
