@@ -1,0 +1,46 @@
+services:
+  app:
+    build: .
+    container_name: magic-market-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://magic:${POSTGRES_PASSWORD}@db:5432/magic_market
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    container_name: magic-market-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: magic_market
+      POSTGRES_USER: magic
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U magic -d magic_market"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build: .
+    container_name: magic-market-migrate
+    command: npx prisma migrate deploy
+    environment:
+      DATABASE_URL: postgresql://magic:${POSTGRES_PASSWORD}@db:5432/magic_market
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  postgres_data:
