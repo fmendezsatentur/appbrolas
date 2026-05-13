@@ -5,14 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2, Search } from 'lucide-react'
-
-interface AddCardDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onSave: (card: CardFormData) => Promise<void>
-  initialData?: Partial<CardFormData>
-}
+import { Loader2 } from 'lucide-react'
 
 export interface CardFormData {
   cardName: string
@@ -30,173 +23,288 @@ export interface CardFormData {
   notes?: string
 }
 
-export function AddCardDialog({ open, onOpenChange, onSave, initialData }: AddCardDialogProps) {
-  const [form, setForm] = React.useState<CardFormData>({
-    cardName: '',
-    condition: 'NM',
-    isFoil: false,
-    quantity: 1,
-    price: 0,
-    language: 'en',
-    ...initialData,
-  })
-  const [searching, setSearching] = React.useState(false)
-  const [saving, setSaving] = React.useState(false)
-  const [preview, setPreview] = React.useState<string | null>(initialData?.imageUrl ?? null)
+interface PrintOption {
+  id: string
+  name: string
+  set: string
+  set_name: string
+  collector_number: string
+  imageUrl: string | null
+  prices: { usd: string | null; usd_foil: string | null }
+  released_at: string
+}
 
-  const set = (field: keyof CardFormData, value: any) =>
+interface AddCardDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSave: (card: CardFormData) => Promise<void>
+  initialData?: Partial<CardFormData>
+}
+
+export function AddCardDialog({ open, onOpenChange, onSave, initialData }: AddCardDialogProps) {
+  const [cardName, setCardName] = React.useState(initialData?.cardName ?? '')
+  const [suggestions, setSuggestions] = React.useState<string[]>([])
+  const [showSuggestions, setShowSuggestions] = React.useState(false)
+  const [prints, setPrints] = React.useState<PrintOption[]>([])
+  const [selectedPrint, setSelectedPrint] = React.useState<PrintOption | null>(null)
+  const [loadingPrints, setLoadingPrints] = React.useState(false)
+  const [step, setStep] = React.useState<'name' | 'print' | 'details'>('name')
+  const [form, setForm] = React.useState({
+    condition: initialData?.condition ?? 'NM',
+    isFoil: initialData?.isFoil ?? false,
+    quantity: initialData?.quantity ?? 1,
+    price: initialData?.price ?? 0,
+    language: initialData?.language ?? 'en',
+    notes: initialData?.notes ?? '',
+  })
+  const [saving, setSaving] = React.useState(false)
+  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const set = (field: string, value: any) =>
     setForm((prev) => ({ ...prev, [field]: value }))
 
-  const searchScryfall = async () => {
-    if (!form.cardName.trim()) return
-    setSearching(true)
+  // Autocomplete mientras escribe
+  React.useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (cardName.length < 2) { setSuggestions([]); return }
+
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/scryfall/autocomplete?q=${encodeURIComponent(cardName)}`)
+        const data = await res.json()
+        setSuggestions(data.data ?? [])
+        setShowSuggestions(true)
+      } catch { setSuggestions([]) }
+    }, 250)
+  }, [cardName])
+
+  const selectName = async (name: string) => {
+    setCardName(name)
+    setSuggestions([])
+    setShowSuggestions(false)
+    setLoadingPrints(true)
+    setStep('print')
     try {
-      const res = await fetch(`/api/scryfall?name=${encodeURIComponent(form.cardName)}`)
-      if (res.ok) {
-        const card = await res.json()
-        const imgUrl =
-          card.image_uris?.normal ?? card.card_faces?.[0]?.image_uris?.normal ?? null
-        const priceRef = parseFloat(form.isFoil ? card.prices?.usd_foil : card.prices?.usd) || undefined
-        setForm((prev) => ({
-          ...prev,
-          cardName: card.name,
-          setName: card.set_name,
-          setCode: card.set,
-          collectorNumber: card.collector_number,
-          imageUrl: imgUrl ?? prev.imageUrl,
-          scryfallId: card.id,
-          priceRef,
-          price: prev.price || priceRef || 0,
-        }))
-        setPreview(imgUrl)
-      }
+      const res = await fetch(`/api/scryfall/prints?name=${encodeURIComponent(name)}`)
+      const data = await res.json()
+      setPrints(data.data ?? [])
     } finally {
-      setSearching(false)
+      setLoadingPrints(false)
     }
+  }
+
+  const selectPrint = (print: PrintOption) => {
+    setSelectedPrint(print)
+    const priceRef = form.isFoil
+      ? parseFloat(print.prices.usd_foil ?? '0') || undefined
+      : parseFloat(print.prices.usd ?? '0') || undefined
+    setForm((prev) => ({ ...prev, price: priceRef ?? prev.price }))
+    setStep('details')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!selectedPrint) return
     setSaving(true)
     try {
-      await onSave(form)
+      await onSave({
+        cardName: selectedPrint.name,
+        setName: selectedPrint.set_name,
+        setCode: selectedPrint.set,
+        collectorNumber: selectedPrint.collector_number,
+        imageUrl: selectedPrint.imageUrl ?? undefined,
+        scryfallId: selectedPrint.id,
+        priceRef: form.isFoil
+          ? parseFloat(selectedPrint.prices.usd_foil ?? '0') || undefined
+          : parseFloat(selectedPrint.prices.usd ?? '0') || undefined,
+        ...form,
+        price: Number(form.price),
+        quantity: Number(form.quantity),
+      })
       onOpenChange(false)
+      resetDialog()
     } finally {
       setSaving(false)
     }
   }
 
+  const resetDialog = () => {
+    setCardName('')
+    setSuggestions([])
+    setPrints([])
+    setSelectedPrint(null)
+    setStep('name')
+    setForm({ condition: 'NM', isFoil: false, quantity: 1, price: 0, language: 'en', notes: '' })
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetDialog() }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Agregar carta</DialogTitle>
+          <DialogTitle>
+            {step === 'name' && 'Buscar carta'}
+            {step === 'print' && `Elegir edición — ${cardName}`}
+            {step === 'details' && `Detalles — ${selectedPrint?.set_name}`}
+          </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Nombre de la carta</Label>
-            <div className="flex gap-2">
+        {/* PASO 1: nombre con autocomplete */}
+        {step === 'name' && (
+          <div className="space-y-3">
+            <div className="relative">
               <Input
-                value={form.cardName}
-                onChange={(e) => set('cardName', e.target.value)}
-                placeholder="Lightning Bolt"
-                required
+                autoFocus
+                value={cardName}
+                onChange={(e) => setCardName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && cardName.trim()) selectName(cardName.trim())
+                  if (e.key === 'Escape') setShowSuggestions(false)
+                }}
+                placeholder="Lightning Bolt, Black Lotus..."
+                className="text-base"
               />
-              <Button type="button" variant="outline" size="icon" onClick={searchScryfall} disabled={searching}>
-                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              </Button>
-            </div>
-          </div>
-
-          {preview && (
-            <img src={preview} alt={form.cardName} className="w-32 rounded-lg border border-border" />
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Condición</Label>
-              <select
-                value={form.condition}
-                onChange={(e) => set('condition', e.target.value)}
-                className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
-              >
-                {[['NM', 'Near Mint'], ['LP', 'Lightly Played'], ['MP', 'Moderately Played'], ['HP', 'Heavily Played'], ['DMG', 'Damaged']].map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Idioma</Label>
-              <select
-                value={form.language}
-                onChange={(e) => set('language', e.target.value)}
-                className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
-              >
-                {[['en', 'Inglés'], ['es', 'Español'], ['pt', 'Portugués'], ['jp', 'Japonés'], ['de', 'Alemán'], ['fr', 'Francés']].map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Cantidad</Label>
-              <Input
-                type="number"
-                min={1}
-                value={form.quantity}
-                onChange={(e) => set('quantity', parseInt(e.target.value))}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Precio (USD)</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  value={form.price}
-                  onChange={(e) => set('price', parseFloat(e.target.value))}
-                  className="pl-6"
-                  required
-                />
-              </div>
-              {form.priceRef && (
-                <p className="text-xs text-muted-foreground">Ref TCGPlayer: ${form.priceRef.toFixed(2)}</p>
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 border border-border bg-popover rounded-lg shadow-lg overflow-hidden">
+                  {suggestions.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent transition-colors"
+                      onClick={() => selectName(s)}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
+            <p className="text-xs text-muted-foreground">
+              Escribí el nombre en inglés y seleccioná de las sugerencias.
+            </p>
           </div>
+        )}
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="foil"
-              checked={form.isFoil}
-              onChange={(e) => set('isFoil', e.target.checked)}
-              className="rounded"
-            />
-            <Label htmlFor="foil">Foil</Label>
+        {/* PASO 2: elegir edición */}
+        {step === 'print' && (
+          <div className="space-y-3">
+            <Button variant="ghost" size="sm" onClick={() => setStep('name')}>← Volver</Button>
+            {loadingPrints ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-[50vh] overflow-y-auto pr-1">
+                {prints.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => selectPrint(p)}
+                    className="flex flex-col items-center gap-1 p-2 rounded-lg border border-border hover:border-primary hover:bg-accent transition-colors text-center"
+                  >
+                    {p.imageUrl ? (
+                      <img src={p.imageUrl} alt={p.set_name} className="w-full rounded-md" />
+                    ) : (
+                      <div className="w-full aspect-[2/3] bg-muted rounded-md flex items-center justify-center text-xs text-muted-foreground">
+                        Sin imagen
+                      </div>
+                    )}
+                    <span className="text-xs font-medium leading-tight">{p.set_name}</span>
+                    <span className="text-xs text-muted-foreground">{p.released_at?.slice(0, 4)}</span>
+                    {p.prices.usd && (
+                      <span className="text-xs text-primary font-bold">${p.prices.usd}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+        )}
 
-          <div className="space-y-2">
-            <Label>Notas (opcional)</Label>
-            <Textarea
-              value={form.notes ?? ''}
-              onChange={(e) => set('notes', e.target.value)}
-              placeholder="Estado especial, defectos, etc."
-              rows={2}
-            />
-          </div>
+        {/* PASO 3: detalles */}
+        {step === 'details' && selectedPrint && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Button type="button" variant="ghost" size="sm" onClick={() => setStep('print')}>← Cambiar edición</Button>
 
-          <Button type="submit" className="w-full" disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Publicar carta
-          </Button>
-        </form>
+            <div className="flex gap-4">
+              {selectedPrint.imageUrl && (
+                <img src={selectedPrint.imageUrl} alt={cardName} className="w-28 rounded-lg border border-border flex-shrink-0" />
+              )}
+              <div className="flex-1 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Condición</Label>
+                    <select
+                      value={form.condition}
+                      onChange={(e) => set('condition', e.target.value)}
+                      className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+                    >
+                      {[['NM','Near Mint'],['LP','Lightly Played'],['MP','Moderately Played'],['HP','Heavily Played'],['DMG','Damaged']].map(([v,l]) => (
+                        <option key={v} value={v}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Idioma</Label>
+                    <select
+                      value={form.language}
+                      onChange={(e) => set('language', e.target.value)}
+                      className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+                    >
+                      {[['en','Inglés'],['es','Español'],['pt','Portugués'],['jp','Japonés'],['de','Alemán'],['fr','Francés']].map(([v,l]) => (
+                        <option key={v} value={v}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Cantidad</Label>
+                    <Input type="number" min={1} value={form.quantity} onChange={(e) => set('quantity', e.target.value)} required />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>
+                      Precio (USD)
+                      {selectedPrint.prices.usd && (
+                        <span className="text-xs text-muted-foreground ml-1">
+                          · Ref TCG: ${form.isFoil ? selectedPrint.prices.usd_foil : selectedPrint.prices.usd}
+                        </span>
+                      )}
+                    </Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                      <Input
+                        type="number" step="0.01" min={0}
+                        value={form.price}
+                        onChange={(e) => set('price', e.target.value)}
+                        className="pl-6" required
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox" id="foil" checked={form.isFoil}
+                    onChange={(e) => {
+                      set('isFoil', e.target.checked)
+                      const p = e.target.checked ? selectedPrint.prices.usd_foil : selectedPrint.prices.usd
+                      if (p) set('price', parseFloat(p))
+                    }}
+                    className="rounded"
+                  />
+                  <Label htmlFor="foil">Foil</Label>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Notas (opcional)</Label>
+              <Textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} rows={2} placeholder="Estado especial, defectos, etc." />
+            </div>
+
+            <Button type="submit" className="w-full" disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Publicar carta
+            </Button>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   )

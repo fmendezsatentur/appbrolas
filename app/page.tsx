@@ -16,6 +16,23 @@ export default function MarketplacePage() {
   const [loading, setLoading] = React.useState(true)
   const [search, setSearch] = React.useState('')
   const [condition, setCondition] = React.useState<string | null>(null)
+  const [suggestions, setSuggestions] = React.useState<string[]>([])
+  const [showSuggestions, setShowSuggestions] = React.useState(false)
+  const suggestDebounce = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const fetchSuggestions = (q: string) => {
+    if (suggestDebounce.current) clearTimeout(suggestDebounce.current)
+    if (q.length < 2) { setSuggestions([]); return }
+    suggestDebounce.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/cards?search=${encodeURIComponent(q)}`)
+        const data: ListingWithUser[] = await res.json()
+        const names = [...new Set(data.map((l) => l.cardName))].slice(0, 6)
+        setSuggestions(names)
+        setShowSuggestions(names.length > 0)
+      } catch { setSuggestions([]) }
+    }, 200)
+  }
   const [cart, setCart] = React.useState<CartItem[]>(() => {
     if (typeof window === 'undefined') return []
     try {
@@ -100,10 +117,27 @@ export default function MarketplacePage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); fetchSuggestions(e.target.value) }}
+              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              onKeyDown={(e) => e.key === 'Escape' && setShowSuggestions(false)}
               placeholder="Buscar carta..."
               className="pl-9"
             />
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute z-50 top-full left-0 right-0 mt-1 border border-border bg-popover rounded-lg shadow-lg overflow-hidden">
+                {suggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent transition-colors"
+                    onMouseDown={() => { setSearch(s); setShowSuggestions(false) }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2 flex-wrap">
