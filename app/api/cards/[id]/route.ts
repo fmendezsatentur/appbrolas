@@ -30,6 +30,12 @@ export async function PATCH(
       ...(body.condition !== undefined && { condition: body.condition }),
       ...(body.notes !== undefined && { notes: body.notes }),
       ...(body.isActive !== undefined && { isActive: body.isActive }),
+      ...(body.setName !== undefined && { setName: body.setName }),
+      ...(body.setCode !== undefined && { setCode: body.setCode }),
+      ...(body.collectorNumber !== undefined && { collectorNumber: body.collectorNumber }),
+      ...(body.imageUrl !== undefined && { imageUrl: body.imageUrl }),
+      ...(body.scryfallId !== undefined && { scryfallId: body.scryfallId }),
+      ...(body.priceRef !== undefined && { priceRef: body.priceRef !== null ? parseFloat(body.priceRef) : null }),
     },
   })
 
