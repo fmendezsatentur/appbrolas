@@ -9,9 +9,11 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { ImportDialog, type CardToPublish } from '@/components/ImportDialog'
 import { AddCardDialog, type CardFormData } from '@/components/AddCardDialog'
+import { AddSealedDialog, type SealedFormData } from '@/components/AddSealedDialog'
+import { type SealedListingWithUser } from '@/components/SealedItem'
 import {
   Plus, Upload, Pencil, Trash2, ToggleLeft, ToggleRight,
-  Loader2, Check, X, ImageOff, ChevronDown, Square, CheckSquare, AlertTriangle,
+  Loader2, Check, X, ImageOff, ChevronDown, Square, CheckSquare, AlertTriangle, Package,
 } from 'lucide-react'
 
 interface MyListing {
@@ -61,6 +63,10 @@ export default function MisCartasPage() {
   const [publishing, setPublishing] = React.useState(false)
   const [hasPhone, setHasPhone] = React.useState<boolean | null>(null)
 
+  // Sealed state
+  const [sealedListings, setSealedListings] = React.useState<SealedListingWithUser[]>([])
+  const [addSealedOpen, setAddSealedOpen] = React.useState(false)
+
   // Inline edit state
   const [editingId, setEditingId] = React.useState<string | null>(null)
   const [editDraft, setEditDraft] = React.useState<EditDraft>({ price: '', quantity: '', condition: '' })
@@ -83,9 +89,10 @@ export default function MisCartasPage() {
     if (!session?.user?.id) return
     setLoading(true)
     try {
-      const [listingsRes, profileRes] = await Promise.all([
+      const [listingsRes, profileRes, sealedRes] = await Promise.all([
         fetch(`/api/cards?seller=${session.user.id}`),
         fetch('/api/profile'),
+        fetch(`/api/sealed?seller=${session.user.id}`),
       ])
       const data = await listingsRes.json()
       setListings(data)
@@ -93,6 +100,7 @@ export default function MisCartasPage() {
         const profile = await profileRes.json()
         setHasPhone(!!(profile.phone))
       }
+      if (sealedRes.ok) setSealedListings(await sealedRes.json())
     } finally {
       setLoading(false)
     }
@@ -114,6 +122,38 @@ export default function MisCartasPage() {
     }
     toast.success(`${card.cardName} publicada`)
     await fetchMyListings()
+  }
+
+  const publishSealed = async (data: SealedFormData) => {
+    const res = await fetch('/api/sealed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error ?? 'Error publicando')
+    }
+    toast.success('Producto publicado')
+    await fetchMyListings()
+  }
+
+  const deleteSealed = async (id: string, title: string) => {
+    if (!confirm(`¿Eliminar "${title}"?`)) return
+    const res = await fetch(`/api/sealed/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      toast.success('Eliminado')
+      setSealedListings((prev) => prev.filter((l) => l.id !== id))
+    }
+  }
+
+  const toggleSealedActive = async (id: string, isActive: boolean) => {
+    await fetch(`/api/sealed/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive: !isActive }),
+    })
+    setSealedListings((prev) => prev.map((l) => l.id === id ? { ...l, isActive: !isActive } : l))
   }
 
   const handleImport = async (cards: CardToPublish[]) => {
@@ -322,14 +362,18 @@ export default function MisCartasPage() {
               {active.length} activas · {inactive.length} inactivas
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" className="gap-2" onClick={() => setImportOpen(true)} disabled={publishing}>
               {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               Importar Moxfield
             </Button>
-            <Button className="gap-2" onClick={() => setAddOpen(true)}>
+            <Button variant="outline" className="gap-2" onClick={() => setAddOpen(true)}>
               <Plus className="h-4 w-4" />
               Agregar carta
+            </Button>
+            <Button className="gap-2" onClick={() => setAddSealedOpen(true)}>
+              <Package className="h-4 w-4" />
+              Publicar sellado
             </Button>
           </div>
         </div>
@@ -594,10 +638,63 @@ export default function MisCartasPage() {
             </div>
           </>
         )}
+
+        {/* Sealed section */}
+        <div className="mt-10">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-bold">Material sellado</h2>
+              <p className="text-muted-foreground text-sm">{sealedListings.length} publicaciones</p>
+            </div>
+            <Button className="gap-2" size="sm" onClick={() => setAddSealedOpen(true)}>
+              <Plus className="h-4 w-4" /> Agregar
+            </Button>
+          </div>
+
+          {sealedListings.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground border border-dashed border-border rounded-xl">
+              <Package className="h-8 w-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No tenés productos sellados publicados</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {sealedListings.map((listing) => (
+                <div key={listing.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${listing.isActive ? 'border-border bg-card' : 'border-border/50 bg-card/50 opacity-60'}`}>
+                  {listing.imageUrl ? (
+                    <img src={listing.imageUrl} alt={listing.title} className="w-10 h-14 object-cover rounded flex-shrink-0" />
+                  ) : (
+                    <div className="w-10 h-14 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm truncate">{listing.title}</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded border border-border bg-muted text-muted-foreground flex-shrink-0">{listing.tag}</span>
+                    </div>
+                    {listing.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{listing.description}</p>
+                    )}
+                  </div>
+                  <div className="font-bold flex-shrink-0">${listing.price.toFixed(2)}</div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleSealedActive(listing.id, listing.isActive)} title={listing.isActive ? 'Pausar' : 'Activar'}>
+                      {listing.isActive ? <ToggleRight className="h-4 w-4 text-primary" /> : <ToggleLeft className="h-4 w-4" />}
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => deleteSealed(listing.id, listing.title)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
 
       <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImport={handleImport} />
       <AddCardDialog open={addOpen} onOpenChange={setAddOpen} onSave={publishCard} />
+      <AddSealedDialog open={addSealedOpen} onOpenChange={setAddSealedOpen} onSave={publishSealed} />
     </div>
   )
 }

@@ -9,6 +9,12 @@ export async function GET(request: NextRequest) {
   const sellerName = searchParams.get('sellerName')
   const condition = searchParams.get('condition')
   const color = searchParams.get('color')
+  const sort = searchParams.get('sort') ?? 'newest'
+
+  const orderBy =
+    sort === 'price_asc'  ? { price: 'asc' as const } :
+    sort === 'price_desc' ? { price: 'desc' as const } :
+    { createdAt: 'desc' as const }
 
   const listings = await prisma.cardListing.findMany({
     where: {
@@ -22,7 +28,7 @@ export async function GET(request: NextRequest) {
     include: {
       user: { select: { id: true, name: true, email: true, image: true, phone: true } },
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy,
   })
 
   return NextResponse.json(listings)
