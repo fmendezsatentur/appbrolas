@@ -38,7 +38,9 @@ services:
       retries: 5
 
   migrate:
-    build: .
+    build:
+      context: .
+      target: migrator
     container_name: magic-market-migrate
     command: npx prisma migrate deploy
     environment:
