@@ -376,7 +376,7 @@ export default function MarketplacePage() {
                   : <p className="text-sm mt-1">Iniciá sesión para publicar una búsqueda</p>}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-8">
                 {wanted.map(w => <WantedCard key={w.id} listing={w} />)}
               </div>
             )}
