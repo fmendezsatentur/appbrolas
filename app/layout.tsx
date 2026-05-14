@@ -3,6 +3,7 @@ import { Geist } from 'next/font/google'
 import './globals.css'
 import { SessionProvider } from 'next-auth/react'
 import { Toaster } from '@/components/ui/sonner'
+import { UpdateBanner } from '@/components/UpdateBanner'
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
 
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es" className={`${geist.variable} dark h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <SessionProvider>
+          <UpdateBanner />
           {children}
           <Toaster richColors />
         </SessionProvider>

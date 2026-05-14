@@ -23,9 +23,10 @@ interface AddSealedDialogProps {
   onOpenChange: (open: boolean) => void
   onSave: (data: SealedFormData) => Promise<void>
   initial?: Partial<SealedFormData>
+  isEdit?: boolean
 }
 
-export function AddSealedDialog({ open, onOpenChange, onSave, initial }: AddSealedDialogProps) {
+export function AddSealedDialog({ open, onOpenChange, onSave, initial, isEdit }: AddSealedDialogProps) {
   const [form, setForm] = React.useState<SealedFormData>({
     title: initial?.title ?? '',
     description: initial?.description ?? '',
@@ -33,6 +34,20 @@ export function AddSealedDialog({ open, onOpenChange, onSave, initial }: AddSeal
     price: initial?.price ?? 0,
     tag: initial?.tag ?? 'OTROS',
   })
+
+  // Sync form when initial changes (e.g. opening edit for different listing)
+  React.useEffect(() => {
+    if (open && initial) {
+      setForm({
+        title: initial.title ?? '',
+        description: initial.description ?? '',
+        imageUrl: initial.imageUrl ?? '',
+        price: initial.price ?? 0,
+        tag: initial.tag ?? 'OTROS',
+      })
+      setImageSearch('')
+    }
+  }, [open, initial])
   const [saving, setSaving] = React.useState(false)
   const [imageSearch, setImageSearch] = React.useState('')
   const [imageSuggestions, setImageSuggestions] = React.useState<string[]>([])
@@ -94,7 +109,7 @@ export function AddSealedDialog({ open, onOpenChange, onSave, initial }: AddSeal
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetForm() }}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Publicar producto sellado</DialogTitle>
+          <DialogTitle>{isEdit ? 'Editar publicación' : 'Publicar producto sellado'}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -203,7 +218,7 @@ export function AddSealedDialog({ open, onOpenChange, onSave, initial }: AddSeal
 
           <Button type="submit" className="w-full" disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            Publicar producto
+            {isEdit ? 'Guardar cambios' : 'Publicar producto'}
           </Button>
         </form>
       </DialogContent>

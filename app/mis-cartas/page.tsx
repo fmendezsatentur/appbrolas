@@ -86,6 +86,7 @@ export default function MisCartasPage() {
   // Sealed state
   const [sealedListings, setSealedListings] = React.useState<SealedListingWithUser[]>([])
   const [addSealedOpen, setAddSealedOpen] = React.useState(false)
+  const [editingSealed, setEditingSealed] = React.useState<SealedListingWithUser | null>(null)
 
   // Orders state
   const [pageTab, setPageTab] = React.useState<'cards' | 'sealed' | 'auctions' | 'sales' | 'purchases'>('cards')
@@ -165,6 +166,22 @@ export default function MisCartasPage() {
       throw new Error(err.error ?? 'Error publicando')
     }
     toast.success('Producto publicado')
+    await fetchMyListings()
+  }
+
+  const updateSealed = async (data: SealedFormData) => {
+    if (!editingSealed) return
+    const res = await fetch(`/api/sealed/${editingSealed.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error ?? 'Error al actualizar')
+    }
+    toast.success('Publicación actualizada')
+    setEditingSealed(null)
     await fetchMyListings()
   }
 
@@ -546,6 +563,9 @@ export default function MisCartasPage() {
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleSealedActive(listing.id, listing.isActive)} title={listing.isActive ? 'Pausar' : 'Activar'}>
                       {listing.isActive ? <ToggleRight className="h-4 w-4 text-primary" /> : <ToggleLeft className="h-4 w-4" />}
                     </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingSealed(listing)} title="Editar">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => deleteSealed(listing.id, listing.title)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -884,6 +904,19 @@ export default function MisCartasPage() {
       <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImport={handleImport} />
       <AddCardDialog open={addOpen} onOpenChange={setAddOpen} onSave={publishCard} />
       <AddSealedDialog open={addSealedOpen} onOpenChange={setAddSealedOpen} onSave={publishSealed} />
+      <AddSealedDialog
+        open={!!editingSealed}
+        onOpenChange={(v) => { if (!v) setEditingSealed(null) }}
+        onSave={updateSealed}
+        isEdit
+        initial={editingSealed ? {
+          title: editingSealed.title,
+          description: editingSealed.description ?? '',
+          imageUrl: editingSealed.imageUrl ?? '',
+          price: editingSealed.price,
+          tag: editingSealed.tag,
+        } : undefined}
+      />
     </div>
   )
 }
