@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 
-const ALLOWED_EMOJIS = ['🔥', '👏', '🎉', '💰', '😮', '👑', '🤑', '🚀', '😂', '❤️']
+const ALLOWED_EMOJIS = ['👍', '❤️', '🔥', '😂', '😮', '🙏', '🍆', '💀', '🎉', '👑']
 const MAX_REACTIONS_PER_BID = 10
 
 export async function POST(

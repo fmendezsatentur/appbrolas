@@ -9,7 +9,7 @@ import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
-const EMOJIS = ['🔥', '👏', '🎉', '💰', '😮', '👑', '🤑', '🚀', '😂', '❤️']
+const EMOJIS = ['👍', '❤️', '🔥', '😂', '😮', '🙏', '🍆', '💀', '🎉', '👑']
 
 interface Reaction {
   id: string
