@@ -3,7 +3,7 @@ set -e
 
 cd ~/magic-market
 
-git pull origin main
+git pull origin master
 
 export APP_VERSION=$(git rev-parse --short HEAD)
 
