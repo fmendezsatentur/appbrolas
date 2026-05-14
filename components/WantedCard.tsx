@@ -24,36 +24,34 @@ export default function WantedCard({ listing }: { listing: WantedListingWithUser
   return (
     <div className="flex flex-col items-center gap-2">
       {/* Poster */}
-      <div className="relative w-full" style={{ aspectRatio: '5/6' }}>
-        {/* Card image — rendered first (behind the poster frame) */}
-        <div
-          className="absolute overflow-hidden rounded-sm"
-          style={{ top: '17%', left: '8%', width: '84%', height: '74%' }}
-        >
-          {listing.imageUrl ? (
-            <Image
-              src={listing.imageUrl}
-              alt={listing.cardName}
-              fill
-              className="object-cover object-top"
-              sizes="200px"
-            />
-          ) : (
-            <div className="w-full h-full bg-amber-50 flex items-center justify-center text-amber-900/50 text-xs font-bold text-center px-2 leading-tight">
-              {listing.cardName}
-            </div>
-          )}
-        </div>
-
-        {/* Poster frame on top — its border overlaps the card edges */}
+      <div className="relative w-full" style={{ aspectRatio: '3/4' }}>
+        {/* Poster background */}
         <Image
           src="/wanted-poster.png"
           alt="wanted poster"
           fill
           className="object-contain"
           sizes="(max-width: 768px) 50vw, 25vw"
-          style={{ zIndex: 1 }}
         />
+        {/* Card image inside the cream frame area */}
+        <div
+          className="absolute overflow-hidden"
+          style={{ top: '20%', left: '10%', width: '80%', height: '68%' }}
+        >
+          {listing.imageUrl ? (
+            <Image
+              src={listing.imageUrl}
+              alt={listing.cardName}
+              fill
+              className="object-contain"
+              sizes="200px"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-amber-900/40 text-xs font-bold text-center px-2 leading-tight">
+              {listing.cardName}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Info below poster */}
