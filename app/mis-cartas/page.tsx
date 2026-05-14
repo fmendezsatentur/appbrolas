@@ -13,6 +13,8 @@ import { AddSealedDialog, type SealedFormData } from '@/components/AddSealedDial
 import { type SealedListingWithUser } from '@/components/SealedItem'
 import AddAuctionDialog from '@/components/AddAuctionDialog'
 import { type AuctionWithMeta } from '@/components/AuctionCard'
+import AddWantedDialog from '@/components/AddWantedDialog'
+import { type WantedListingWithUser } from '@/components/WantedCard'
 import Link from 'next/link'
 import {
   Plus, Upload, Pencil, Trash2, ToggleLeft, ToggleRight,
@@ -89,7 +91,7 @@ export default function MisCartasPage() {
   const [editingSealed, setEditingSealed] = React.useState<SealedListingWithUser | null>(null)
 
   // Orders state
-  const [pageTab, setPageTab] = React.useState<'cards' | 'sealed' | 'auctions' | 'sales' | 'purchases'>('cards')
+  const [pageTab, setPageTab] = React.useState<'cards' | 'sealed' | 'auctions' | 'wanted' | 'sales' | 'purchases'>('cards')
   const [sales, setSales] = React.useState<Order[]>([])
   const [purchases, setPurchases] = React.useState<Order[]>([])
   const [loadingOrders, setLoadingOrders] = React.useState(false)
@@ -97,6 +99,10 @@ export default function MisCartasPage() {
   // My auctions
   const [myAuctions, setMyAuctions] = React.useState<AuctionWithMeta[]>([])
   const [loadingAuctions, setLoadingAuctions] = React.useState(false)
+
+  // My wanted
+  const [myWanted, setMyWanted] = React.useState<WantedListingWithUser[]>([])
+  const [loadingWanted, setLoadingWanted] = React.useState(false)
 
   // Inline edit state
   const [editingId, setEditingId] = React.useState<string | null>(null)
@@ -221,10 +227,27 @@ export default function MisCartasPage() {
     if ((pageTab === 'sales' || pageTab === 'purchases') && sales.length === 0 && purchases.length === 0) {
       fetchOrders()
     }
-    if (pageTab === 'auctions') {
-      fetchMyAuctions()
-    }
+    if (pageTab === 'auctions') fetchMyAuctions()
+    if (pageTab === 'wanted') fetchMyWanted()
   }, [pageTab])
+
+  const fetchMyWanted = async () => {
+    if (!session?.user?.id) return
+    setLoadingWanted(true)
+    try {
+      const res = await fetch(`/api/wanted?seller=${session.user.id}`)
+      if (res.ok) setMyWanted(await res.json())
+    } finally { setLoadingWanted(false) }
+  }
+
+  const deleteWanted = async (id: string, name: string) => {
+    if (!confirm(`¿Eliminar búsqueda de "${name}"?`)) return
+    const res = await fetch(`/api/wanted/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      toast.success('Búsqueda eliminada')
+      setMyWanted(prev => prev.filter(w => w.id !== id))
+    }
+  }
 
   const fetchMyAuctions = async () => {
     if (!session?.user?.id) return
@@ -491,6 +514,9 @@ export default function MisCartasPage() {
             {pageTab === 'auctions' && (
               <AddAuctionDialog onCreated={fetchMyAuctions} />
             )}
+            {pageTab === 'wanted' && (
+              <AddWantedDialog onCreated={fetchMyWanted} />
+            )}
           </div>
         </div>
 
@@ -500,6 +526,7 @@ export default function MisCartasPage() {
             { key: 'cards',     label: 'Mis cartas', icon: <Package className="h-4 w-4" /> },
             { key: 'sealed',    label: `Sellado${sealedListings.length ? ` (${sealedListings.length})` : ''}`, icon: <Package className="h-4 w-4" /> },
             { key: 'auctions',  label: `Subastas${myAuctions.length ? ` (${myAuctions.length})` : ''}`, icon: <Gavel className="h-4 w-4" /> },
+            { key: 'wanted',    label: `Buscados${myWanted.length ? ` (${myWanted.length})` : ''}`, icon: <span className="text-sm">🎯</span> },
             { key: 'sales',     label: `Ventas${sales.length ? ` (${sales.length})` : ''}`, icon: <TrendingUp className="h-4 w-4" /> },
             { key: 'purchases', label: `Compras${purchases.length ? ` (${purchases.length})` : ''}`, icon: <ShoppingBag className="h-4 w-4" /> },
           ].map(({ key, label, icon }) => (
@@ -529,6 +556,39 @@ export default function MisCartasPage() {
         {/* PURCHASES TAB */}
         {pageTab === 'purchases' && (
           <OrderList orders={purchases} role="buyer" loading={loadingOrders} />
+        )}
+
+        {/* WANTED TAB */}
+        {pageTab === 'wanted' && (
+          loadingWanted ? (
+            <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : myWanted.length === 0 ? (
+            <div className="text-center py-20 text-muted-foreground border border-dashed border-border rounded-xl">
+              <p className="text-4xl mb-2">🎯</p>
+              <p className="text-sm">No tenés búsquedas activas</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {myWanted.map(w => (
+                <div key={w.id} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card">
+                  {w.imageUrl ? (
+                    <img src={w.imageUrl} alt={w.cardName} className="w-10 h-14 object-contain rounded flex-shrink-0" />
+                  ) : (
+                    <div className="w-10 h-14 rounded bg-muted flex items-center justify-center text-xl flex-shrink-0">🃏</div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate">{w.cardName}</p>
+                    <p className="text-xs text-muted-foreground">Busco x{w.quantity}</p>
+                    {w.notes && <p className="text-xs text-muted-foreground line-clamp-1">{w.notes}</p>}
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive flex-shrink-0"
+                    onClick={() => deleteWanted(w.id, w.cardName)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )
         )}
 
         {/* SEALED TAB */}

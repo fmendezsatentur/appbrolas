@@ -24,6 +24,7 @@ model User {
   auctionsWon     Auction[]       @relation("AuctionWinner")
   bids            Bid[]
   bidReactions    BidReaction[]
+  wantedListings  WantedListing[]
   createdAt       DateTime        @default(now())
   updatedAt     DateTime      @updatedAt
 }
@@ -112,6 +113,22 @@ model BidReaction {
 
   @@unique([bidId, userId])
   @@index([bidId])
+}
+
+model WantedListing {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cardName  String
+  quantity  Int      @default(1)
+  notes     String?
+  imageUrl  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([isActive])
 }
 
 model Order {

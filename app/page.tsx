@@ -6,6 +6,8 @@ import { Navbar } from '@/components/Navbar'
 import { CardItem, type ListingWithUser } from '@/components/CardItem'
 import { SealedItem, type SealedListingWithUser } from '@/components/SealedItem'
 import AuctionCard, { type AuctionWithMeta } from '@/components/AuctionCard'
+import WantedCard, { type WantedListingWithUser } from '@/components/WantedCard'
+import AddWantedDialog from '@/components/AddWantedDialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Search, X, ArrowUpDown } from 'lucide-react'
@@ -22,7 +24,7 @@ const COLORS = [
 ]
 
 type GroupedListing = ListingWithUser & { allIds: string[] }
-type Tab = 'cards' | 'sealed' | 'auctions'
+type Tab = 'cards' | 'sealed' | 'auctions' | 'wanted'
 type Sort = 'newest' | 'price_asc' | 'price_desc'
 
 export default function MarketplacePage() {
@@ -32,6 +34,7 @@ export default function MarketplacePage() {
       const p = new URLSearchParams(window.location.search).get('tab')
       if (p === 'subastas') return 'auctions'
       if (p === 'sealed') return 'sealed'
+      if (p === 'wanted') return 'wanted'
     }
     return 'cards'
   })
@@ -57,6 +60,10 @@ export default function MarketplacePage() {
   const [auctions, setAuctions] = React.useState<AuctionWithMeta[]>([])
   const [loadingAuctions, setLoadingAuctions] = React.useState(false)
   const [auctionStatus, setAuctionStatus] = React.useState<'active' | 'ended'>('active')
+
+  // Wanted
+  const [wanted, setWanted] = React.useState<WantedListingWithUser[]>([])
+  const [loadingWanted, setLoadingWanted] = React.useState(false)
 
   const fetchSuggestions = (q: string) => {
     if (suggestDebounce.current) clearTimeout(suggestDebounce.current)
@@ -133,6 +140,19 @@ export default function MarketplacePage() {
     const t = setTimeout(fetchAuctions, 300)
     return () => clearTimeout(t)
   }, [fetchAuctions])
+
+  const fetchWanted = React.useCallback(async () => {
+    setLoadingWanted(true)
+    try {
+      const res = await fetch('/api/wanted')
+      setWanted(await res.json())
+    } finally { setLoadingWanted(false) }
+  }, [])
+
+  React.useEffect(() => {
+    const t = setTimeout(fetchWanted, 300)
+    return () => clearTimeout(t)
+  }, [fetchWanted])
 
   // Group duplicate card listings
   const grouped: GroupedListing[] = React.useMemo(() => {
@@ -227,6 +247,17 @@ export default function MarketplacePage() {
             {!loadingAuctions && auctions.length > 0 && <span className="ml-2 text-xs font-normal text-yellow-400/70">({auctions.length})</span>}
           </button>
 
+          <button
+            type="button"
+            onClick={() => setTab('wanted')}
+            className={`px-4 py-2.5 text-base font-semibold border-b-2 transition-colors ${
+              tab === 'wanted' ? 'border-amber-600 text-amber-500' : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            🎯 Most Wanted
+            {!loadingWanted && wanted.length > 0 && <span className="ml-2 text-xs font-normal text-amber-500/70">({wanted.length})</span>}
+          </button>
+
           {/* Sort — right aligned */}
           <div className="ml-auto flex items-center gap-1 pb-0.5">
             <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -317,6 +348,36 @@ export default function MarketplacePage() {
                 {grouped.map((listing) => (
                   <CardItem key={listing.id} listing={listing} onAddToCart={addToCart} isInCart={cartItemIds.has(listing.id)} isSelf={!!session?.user?.id && listing.user.id === session.user.id} />
                 ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* WANTED TAB */}
+        {tab === 'wanted' && (
+          <>
+            <div className="flex items-center justify-between mb-6">
+              <p className="text-sm text-muted-foreground">Cartas que la comunidad está buscando</p>
+              {session?.user && <AddWantedDialog onCreated={fetchWanted} />}
+            </div>
+
+            {loadingWanted ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="aspect-[3/4] rounded-xl bg-muted/50 animate-pulse" />
+                ))}
+              </div>
+            ) : wanted.length === 0 ? (
+              <div className="text-center py-20 text-muted-foreground">
+                <p className="text-4xl mb-3">🎯</p>
+                <p className="text-lg">Nadie está buscando cartas todavía</p>
+                {session?.user
+                  ? <p className="text-sm mt-1">¡Sé el primero en publicar una búsqueda!</p>
+                  : <p className="text-sm mt-1">Iniciá sesión para publicar una búsqueda</p>}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                {wanted.map(w => <WantedCard key={w.id} listing={w} />)}
               </div>
             )}
           </>
