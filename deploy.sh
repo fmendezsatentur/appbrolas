@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-cd /opt/magic-market
+cd ~/magic-market
 
 git pull origin main
 
