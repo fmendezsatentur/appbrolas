@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 
+const BID_INCLUDE = {
+  user: { select: { id: true, name: true, image: true } },
+  reactions: { include: { user: { select: { id: true, name: true } } } },
+} as const
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -14,7 +19,7 @@ export async function GET(
       user: { select: { id: true, name: true, image: true, phone: true } },
       winner: { select: { id: true, name: true, phone: true } },
       bids: {
-        include: { user: { select: { id: true, name: true, image: true } } },
+        include: BID_INCLUDE,
         orderBy: { createdAt: 'desc' },
         take: 20,
       },
@@ -35,7 +40,7 @@ export async function GET(
       include: {
         user: { select: { id: true, name: true, image: true, phone: true } },
         winner: { select: { id: true, name: true, phone: true } },
-        bids: { include: { user: { select: { id: true, name: true, image: true } } }, orderBy: { createdAt: 'desc' }, take: 20 },
+        bids: { include: BID_INCLUDE, orderBy: { createdAt: 'desc' }, take: 20 },
       },
     })
     return NextResponse.json(updated)

@@ -9,11 +9,21 @@ import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
+const EMOJIS = ['🔥', '👏', '🎉', '💰', '😮', '👑', '🤑', '🚀', '😂', '❤️']
+
+interface Reaction {
+  id: string
+  emoji: string
+  userId: string
+  user: { id: string; name: string | null }
+}
+
 interface Bid {
   id: string
   amount: number
   createdAt: string
   user: { id: string; name: string | null; image: string | null }
+  reactions: Reaction[]
 }
 
 interface Auction {
@@ -290,28 +300,27 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
           {auction.bids.length > 0 && (
             <div className="mt-8">
               <h2 className="text-lg font-semibold text-white mb-3">Historial de ofertas</h2>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {auction.bids.map((bid, i) => (
-                  <div key={bid.id}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${i === 0 ? 'bg-yellow-500/10 border-yellow-500/40' : 'bg-zinc-900 border-zinc-800'}`}>
-                    <div className="flex items-center gap-3">
-                      {bid.user.image && (
-                        <Image src={bid.user.image} alt="" width={28} height={28} className="rounded-full" />
-                      )}
-                      <div>
-                        <p className="text-sm font-medium text-white">
-                          {bid.user.name}
-                          {i === 0 && <span className="ml-2 text-yellow-400 text-xs">Oferta más alta</span>}
-                        </p>
-                        <p className="text-xs text-zinc-500">
-                          {new Date(bid.createdAt).toLocaleString('es-AR')}
-                        </p>
-                      </div>
-                    </div>
-                    <span className={`font-bold ${i === 0 ? 'text-yellow-400' : 'text-zinc-300'}`}>
-                      ${bid.amount.toLocaleString('es-AR')}
-                    </span>
-                  </div>
+                  <BidRow
+                    key={bid.id}
+                    bid={bid}
+                    isTop={i === 0}
+                    sessionUserId={session?.user?.id ?? null}
+                    onReact={async (emoji) => {
+                      const myReaction = bid.reactions.find(r => r.userId === session?.user?.id)
+                      if (myReaction?.emoji === emoji) {
+                        await fetch(`/api/auctions/bids/${bid.id}/reaction`, { method: 'DELETE' })
+                      } else {
+                        await fetch(`/api/auctions/bids/${bid.id}/reaction`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ emoji }),
+                        })
+                      }
+                      fetchAuction()
+                    }}
+                  />
                 ))}
               </div>
             </div>
@@ -319,5 +328,114 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </main>
     </>
+  )
+}
+
+// ─── BidRow ─────────────────────────────────────────────────────────────────
+
+function BidRow({
+  bid,
+  isTop,
+  sessionUserId,
+  onReact,
+}: {
+  bid: Bid
+  isTop: boolean
+  sessionUserId: string | null
+  onReact: (emoji: string) => void
+}) {
+  const [showPicker, setShowPicker] = useState(false)
+  const [hoveredEmoji, setHoveredEmoji] = useState<string | null>(null)
+
+  const myReaction = bid.reactions.find(r => r.userId === sessionUserId)
+
+  // Group reactions: emoji → list of names
+  const grouped = bid.reactions.reduce<Record<string, string[]>>((acc, r) => {
+    if (!acc[r.emoji]) acc[r.emoji] = []
+    acc[r.emoji].push(r.user.name ?? 'Anónimo')
+    return acc
+  }, {})
+
+  const totalReactions = bid.reactions.length
+  const canReact = !!sessionUserId
+
+  return (
+    <div className={`rounded-lg border ${isTop ? 'bg-yellow-500/10 border-yellow-500/40' : 'bg-zinc-900 border-zinc-800'}`}>
+      {/* Main bid row */}
+      <div className="flex items-center justify-between p-3">
+        <div className="flex items-center gap-3">
+          {bid.user.image && (
+            <Image src={bid.user.image} alt="" width={28} height={28} className="rounded-full" />
+          )}
+          <div>
+            <p className="text-sm font-medium text-white">
+              {bid.user.name}
+              {isTop && <span className="ml-2 text-yellow-400 text-xs">Oferta más alta</span>}
+            </p>
+            <p className="text-xs text-zinc-500">
+              {new Date(bid.createdAt).toLocaleString('es-AR')}
+            </p>
+          </div>
+        </div>
+        <span className={`font-bold ${isTop ? 'text-yellow-400' : 'text-zinc-300'}`}>
+          ${bid.amount.toLocaleString('es-AR')}
+        </span>
+      </div>
+
+      {/* Reactions bar */}
+      <div className="px-3 pb-2 flex items-center gap-1 flex-wrap">
+        {/* Existing grouped reactions */}
+        {Object.entries(grouped).map(([emoji, names]) => (
+          <div key={emoji} className="relative">
+            <button
+              type="button"
+              onClick={() => canReact && onReact(emoji)}
+              onMouseEnter={() => setHoveredEmoji(emoji)}
+              onMouseLeave={() => setHoveredEmoji(null)}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-sm border transition
+                ${myReaction?.emoji === emoji
+                  ? 'bg-yellow-500/20 border-yellow-500/60 text-yellow-300'
+                  : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+                }`}
+            >
+              {emoji} <span className="text-xs">{names.length}</span>
+            </button>
+            {/* Tooltip con nombres */}
+            {hoveredEmoji === emoji && (
+              <div className="absolute bottom-full left-0 mb-1 z-50 bg-zinc-800 border border-zinc-600 rounded-lg px-2 py-1.5 text-xs text-zinc-200 whitespace-nowrap shadow-lg pointer-events-none">
+                {names.join(', ')}
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* Add reaction button */}
+        {canReact && totalReactions < 10 && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowPicker(p => !p)}
+              className="px-2 py-0.5 rounded-full text-sm border border-zinc-700 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 transition"
+            >
+              {myReaction ? '✏️' : '＋'}
+            </button>
+            {showPicker && (
+              <div className="absolute bottom-full left-0 mb-1 z-50 bg-zinc-800 border border-zinc-600 rounded-xl p-2 flex flex-wrap gap-1 shadow-xl max-w-[200px]">
+                {EMOJIS.map(e => (
+                  <button
+                    key={e}
+                    type="button"
+                    onClick={() => { onReact(e); setShowPicker(false) }}
+                    className={`text-lg hover:scale-125 transition-transform p-0.5 rounded ${myReaction?.emoji === e ? 'ring-2 ring-yellow-400' : ''}`}
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

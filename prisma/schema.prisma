@@ -23,6 +23,7 @@ model User {
   auctionsOwned   Auction[]       @relation("AuctionOwner")
   auctionsWon     Auction[]       @relation("AuctionWinner")
   bids            Bid[]
+  bidReactions    BidReaction[]
   createdAt       DateTime        @default(now())
   updatedAt     DateTime      @updatedAt
 }
@@ -87,16 +88,30 @@ model Auction {
 }
 
 model Bid {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   auctionId String
-  auction   Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  auction   Auction       @relation(fields: [auctionId], references: [id], onDelete: Cascade)
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
   amount    Float
-  createdAt DateTime @default(now())
+  createdAt DateTime      @default(now())
+  reactions BidReaction[]
 
   @@index([auctionId])
   @@index([userId])
+}
+
+model BidReaction {
+  id        String   @id @default(cuid())
+  bidId     String
+  bid       Bid      @relation(fields: [bidId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([bidId, userId])
+  @@index([bidId])
 }
 
 model Order {
