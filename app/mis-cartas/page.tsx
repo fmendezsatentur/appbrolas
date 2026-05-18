@@ -19,7 +19,7 @@ import Link from 'next/link'
 import {
   Plus, Upload, Pencil, Trash2, ToggleLeft, ToggleRight,
   Loader2, Check, X, ImageOff, ChevronDown, Square, CheckSquare, AlertTriangle, Package,
-  ShoppingBag, TrendingUp, Clock, CheckCircle2, XCircle, Gavel,
+  ShoppingBag, TrendingUp, Clock, CheckCircle2, XCircle, Gavel, Heart,
 } from 'lucide-react'
 
 interface Order {
@@ -91,7 +91,7 @@ export default function MisCartasPage() {
   const [editingSealed, setEditingSealed] = React.useState<SealedListingWithUser | null>(null)
 
   // Orders state
-  const [pageTab, setPageTab] = React.useState<'cards' | 'sealed' | 'auctions' | 'wanted' | 'sales' | 'purchases'>('cards')
+  const [pageTab, setPageTab] = React.useState<'cards' | 'sealed' | 'auctions' | 'wanted' | 'wishlist' | 'sales' | 'purchases'>('cards')
   const [sales, setSales] = React.useState<Order[]>([])
   const [purchases, setPurchases] = React.useState<Order[]>([])
   const [loadingOrders, setLoadingOrders] = React.useState(false)
@@ -103,6 +103,16 @@ export default function MisCartasPage() {
   // My wanted
   const [myWanted, setMyWanted] = React.useState<WantedListingWithUser[]>([])
   const [loadingWanted, setLoadingWanted] = React.useState(false)
+
+  // Wishlist
+  interface WishlistItem { id: string; cardName: string; createdAt: string }
+  const [wishlist, setWishlist] = React.useState<WishlistItem[]>([])
+  const [loadingWishlist, setLoadingWishlist] = React.useState(false)
+  const [wishlistInput, setWishlistInput] = React.useState('')
+  const [addingWish, setAddingWish] = React.useState(false)
+  const [wishSuggestions, setWishSuggestions] = React.useState<{ id: string; name: string; image: string }[]>([])
+  const [wishSearching, setWishSearching] = React.useState(false)
+  const wishDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Inline edit state
   const [editingId, setEditingId] = React.useState<string | null>(null)
@@ -229,6 +239,7 @@ export default function MisCartasPage() {
     }
     if (pageTab === 'auctions') fetchMyAuctions()
     if (pageTab === 'wanted') fetchMyWanted()
+    if (pageTab === 'wishlist') fetchWishlist()
   }, [pageTab])
 
   const fetchMyWanted = async () => {
@@ -238,6 +249,63 @@ export default function MisCartasPage() {
       const res = await fetch(`/api/wanted?seller=${session.user.id}`)
       if (res.ok) setMyWanted(await res.json())
     } finally { setLoadingWanted(false) }
+  }
+
+  const fetchWishlist = async () => {
+    setLoadingWishlist(true)
+    try {
+      const res = await fetch('/api/wishlist')
+      if (res.ok) setWishlist(await res.json())
+    } finally { setLoadingWishlist(false) }
+  }
+
+  const addWish = async (cardName: string) => {
+    if (!cardName.trim()) return
+    setAddingWish(true)
+    try {
+      const res = await fetch('/api/wishlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardName: cardName.trim() }),
+      })
+      if (res.ok) {
+        const item = await res.json()
+        setWishlist(prev => {
+          if (prev.find(w => w.id === item.id)) return prev
+          return [item, ...prev]
+        })
+        setWishlistInput('')
+        setWishSuggestions([])
+        toast.success(`${item.cardName} agregada a tu wishlist`)
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error ?? 'Error al agregar')
+      }
+    } finally { setAddingWish(false) }
+  }
+
+  const deleteWish = async (id: string, name: string) => {
+    const res = await fetch(`/api/wishlist/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      toast.success(`${name} eliminada de la wishlist`)
+      setWishlist(prev => prev.filter(w => w.id !== id))
+    }
+  }
+
+  const handleWishInputChange = (val: string) => {
+    setWishlistInput(val)
+    if (wishDebounceRef.current) clearTimeout(wishDebounceRef.current)
+    if (val.trim().length < 2) { setWishSuggestions([]); return }
+    wishDebounceRef.current = setTimeout(async () => {
+      setWishSearching(true)
+      try {
+        const res = await fetch(`/api/scryfall/search?q=${encodeURIComponent(val.trim())}`)
+        if (res.ok) {
+          const data = await res.json()
+          setWishSuggestions(data.results ?? [])
+        }
+      } finally { setWishSearching(false) }
+    }, 350)
   }
 
   const deleteWanted = async (id: string, name: string) => {
@@ -527,13 +595,14 @@ export default function MisCartasPage() {
             { key: 'sealed',    label: `Sellado${sealedListings.length ? ` (${sealedListings.length})` : ''}`, icon: <Package className="h-4 w-4" /> },
             { key: 'auctions',  label: `Subastas${myAuctions.length ? ` (${myAuctions.length})` : ''}`, icon: <Gavel className="h-4 w-4" /> },
             { key: 'wanted',    label: `Buscados${myWanted.length ? ` (${myWanted.length})` : ''}`, icon: <span className="text-sm">🎯</span> },
+            { key: 'wishlist',  label: `Wishlist${wishlist.length ? ` (${wishlist.length})` : ''}`, icon: <Heart className="h-4 w-4" /> },
             { key: 'sales',     label: `Ventas${sales.length ? ` (${sales.length})` : ''}`, icon: <TrendingUp className="h-4 w-4" /> },
             { key: 'purchases', label: `Compras${purchases.length ? ` (${purchases.length})` : ''}`, icon: <ShoppingBag className="h-4 w-4" /> },
           ].map(({ key, label, icon }) => (
             <button
               key={key}
               type="button"
-              onClick={() => setPageTab(key as 'cards' | 'sealed' | 'auctions' | 'sales' | 'purchases')}
+              onClick={() => setPageTab(key as 'cards' | 'sealed' | 'auctions' | 'wanted' | 'wishlist' | 'sales' | 'purchases')}
               className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 pageTab === key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
@@ -556,6 +625,83 @@ export default function MisCartasPage() {
         {/* PURCHASES TAB */}
         {pageTab === 'purchases' && (
           <OrderList orders={purchases} role="buyer" loading={loadingOrders} />
+        )}
+
+        {/* WISHLIST TAB */}
+        {pageTab === 'wishlist' && (
+          <div className="space-y-4">
+            {/* Input con autocomplete */}
+            <div className="relative">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    placeholder="Buscar carta para agregar a tu wishlist…"
+                    value={wishlistInput}
+                    onChange={e => handleWishInputChange(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { addWish(wishlistInput); setWishSuggestions([]) } }}
+                    className="pr-8"
+                  />
+                  {wishSearching && (
+                    <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+                <Button
+                  onClick={() => { addWish(wishlistInput); setWishSuggestions([]) }}
+                  disabled={addingWish || !wishlistInput.trim()}
+                  className="gap-2"
+                >
+                  {addingWish ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  Agregar
+                </Button>
+              </div>
+              {wishSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 z-50 mt-1 rounded-lg border border-border bg-popover shadow-lg overflow-hidden max-h-64 overflow-y-auto">
+                  {wishSuggestions.map(s => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className="flex items-center gap-3 w-full px-3 py-2 text-sm hover:bg-muted transition-colors text-left"
+                      onClick={() => { addWish(s.name); setWishSuggestions([]) }}
+                    >
+                      {s.image && <img src={s.image} alt={s.name} className="w-8 h-11 object-contain rounded flex-shrink-0" />}
+                      <span>{s.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Lista */}
+            {loadingWishlist ? (
+              <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            ) : wishlist.length === 0 ? (
+              <div className="text-center py-20 text-muted-foreground border border-dashed border-border rounded-xl">
+                <Heart className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">Tu wishlist está vacía</p>
+                <p className="text-xs mt-1">Agregá cartas y te avisamos cuando alguien las publique</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {wishlist.map(w => (
+                  <div key={w.id} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card">
+                    <Heart className="h-4 w-4 text-pink-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm">{w.cardName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Agregada {new Date(w.createdAt).toLocaleDateString('es-AR')}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive flex-shrink-0"
+                      onClick={() => deleteWish(w.id, w.cardName)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {/* WANTED TAB */}

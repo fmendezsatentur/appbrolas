@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
+import { sendWishlistNotification } from '@/lib/email'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -58,9 +59,9 @@ export async function POST(request: NextRequest) {
   const ADMIN_EMAIL = 'fmendezsatentur@gmail.com'
   if (user.email !== ADMIN_EMAIL) {
     const count = await prisma.cardListing.count({ where: { userId: session.user.id } })
-    if (count >= 50) {
+    if (count >= 200) {
       return NextResponse.json(
-        { error: 'Límite de 50 cartas por usuario. Eliminá alguna antes de publicar más.' },
+        { error: 'Límite de 200 cartas por usuario. Eliminá alguna antes de publicar más.' },
         { status: 400 }
       )
     }
@@ -92,6 +93,31 @@ export async function POST(request: NextRequest) {
       notes,
     },
   })
+
+  // Fire-and-forget: notify users who have this card in their wishlist
+  ;(async () => {
+    try {
+      const wishers = await prisma.wishlistItem.findMany({
+        where: { cardName: { equals: cardName.trim(), mode: 'insensitive' } },
+        include: { user: { select: { email: true, name: true } } },
+      })
+      const seller = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { name: true },
+      })
+      const appUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? 'https://magic.brolas.com.ar'
+      for (const w of wishers) {
+        if (w.userId === session.user.id) continue // no notificar al mismo vendedor
+        await sendWishlistNotification({
+          to: w.user.email,
+          toName: w.user.name ?? 'Jugador',
+          cardName: listing.cardName,
+          sellerName: seller?.name ?? 'alguien',
+          appUrl,
+        })
+      }
+    } catch {}
+  })()
 
   return NextResponse.json(listing, { status: 201 })
 }

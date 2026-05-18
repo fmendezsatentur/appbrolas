@@ -25,6 +25,7 @@ model User {
   bids            Bid[]
   bidReactions    BidReaction[]
   wantedListings  WantedListing[]
+  wishlistItems   WishlistItem[]
   createdAt       DateTime        @default(now())
   updatedAt     DateTime      @updatedAt
 }
@@ -113,6 +114,17 @@ model BidReaction {
 
   @@unique([bidId, userId])
   @@index([bidId])
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cardName  String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, cardName])
+  @@index([cardName])
 }
 
 model WantedListing {
