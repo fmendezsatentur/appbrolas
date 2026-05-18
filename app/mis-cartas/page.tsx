@@ -74,6 +74,8 @@ interface EditDraft {
   quantity: string
   condition: string
   language: string
+  isFoil: boolean
+  notes: string
 }
 
 export default function MisCartasPage() {
@@ -119,7 +121,7 @@ export default function MisCartasPage() {
 
   // Inline edit state
   const [editingId, setEditingId] = React.useState<string | null>(null)
-  const [editDraft, setEditDraft] = React.useState<EditDraft>({ price: '', quantity: '', condition: '', language: 'en' })
+  const [editDraft, setEditDraft] = React.useState<EditDraft>({ price: '', quantity: '', condition: '', language: 'en', isFoil: false, notes: '' })
   const [saving, setSaving] = React.useState(false)
 
   // Edition picker state
@@ -410,6 +412,8 @@ export default function MisCartasPage() {
       quantity: listing.quantity.toString(),
       condition: listing.condition,
       language: listing.language,
+      isFoil: listing.isFoil,
+      notes: listing.notes ?? '',
     })
     setPrintPickerId(null)
   }
@@ -432,13 +436,15 @@ export default function MisCartasPage() {
           quantity: parseInt(editDraft.quantity),
           condition: editDraft.condition,
           language: editDraft.language,
+          isFoil: editDraft.isFoil,
+          notes: editDraft.notes || null,
         }),
       })
       if (!res.ok) throw new Error()
       setListings((prev) =>
         prev.map((l) =>
           l.id === editingId
-            ? { ...l, price: parseFloat(editDraft.price), quantity: parseInt(editDraft.quantity), condition: editDraft.condition, language: editDraft.language }
+            ? { ...l, price: parseFloat(editDraft.price), quantity: parseInt(editDraft.quantity), condition: editDraft.condition, language: editDraft.language, isFoil: editDraft.isFoil, notes: editDraft.notes || null }
             : l
         )
       )
@@ -1072,6 +1078,20 @@ export default function MisCartasPage() {
                               ))}
                             </select>
                           </div>
+                          <div className="space-y-1">
+                            <label className="text-xs text-muted-foreground">Foil</label>
+                            <button
+                              type="button"
+                              onClick={() => setEditDraft(d => ({ ...d, isFoil: !d.isFoil }))}
+                              className={`flex items-center gap-1.5 h-8 px-3 rounded border text-sm font-medium transition-colors ${
+                                editDraft.isFoil
+                                  ? 'border-purple-500/50 bg-purple-500/10 text-purple-400'
+                                  : 'border-border bg-background text-muted-foreground'
+                              }`}
+                            >
+                              {editDraft.isFoil ? '✨ Foil' : 'No foil'}
+                            </button>
+                          </div>
                           <Button
                             size="sm"
                             variant="outline"
@@ -1090,6 +1110,18 @@ export default function MisCartasPage() {
                               Guardar
                             </Button>
                           </div>
+                        </div>
+
+                        {/* Notes */}
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground">Notas (opcional)</label>
+                          <Input
+                            value={editDraft.notes}
+                            onChange={e => setEditDraft(d => ({ ...d, notes: e.target.value }))}
+                            placeholder="Ej: Firmada, alterada, pequeña marca en el borde…"
+                            className="h-8 text-sm"
+                            maxLength={200}
+                          />
                         </div>
 
                         {/* Print picker */}
