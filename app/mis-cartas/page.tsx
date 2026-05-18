@@ -20,8 +20,9 @@ import Link from 'next/link'
 import {
   Plus, Upload, Pencil, Trash2, ToggleLeft, ToggleRight,
   Loader2, Check, X, ImageOff, ChevronDown, Square, CheckSquare, AlertTriangle, Package,
-  ShoppingBag, TrendingUp, Clock, CheckCircle2, XCircle, Gavel, Heart,
+  ShoppingBag, TrendingUp, Clock, CheckCircle2, XCircle, Gavel, Heart, Share2, Copy,
 } from 'lucide-react'
+import { toSlug } from '@/lib/slug'
 
 interface Order {
   id: string
@@ -862,6 +863,30 @@ export default function MisCartasPage() {
         )}
 
         {pageTab === 'cards' && (<>
+
+        {/* Link público */}
+        {session?.user?.name && (() => {
+          const slug = toSlug(session.user.name)
+          const url = `magic.brolas.com.ar/${slug}`
+          const fullUrl = `https://${url}`
+          return (
+            <div className="flex items-center gap-3 mb-4 p-3 rounded-lg border border-border bg-card text-sm">
+              <Share2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-muted-foreground">Tu carpeta pública:</span>
+              <a href={fullUrl} target="_blank" rel="noopener noreferrer" className="font-mono text-primary hover:underline truncate">
+                {url}
+              </a>
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 ml-auto"
+                onClick={() => { navigator.clipboard.writeText(fullUrl); toast.success('Link copiado') }}
+              >
+                <Copy className="h-3.5 w-3.5" />
+                Copiar
+              </button>
+            </div>
+          )
+        })()}
 
         {/* WhatsApp warning */}
         {hasPhone === false && (
