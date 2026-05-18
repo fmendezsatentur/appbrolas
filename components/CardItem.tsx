@@ -89,6 +89,9 @@ export function CardItem({ listing, onAddToCart, isInCart, isSelf }: CardItemPro
           {listing.setName && (
             <p className="text-xs text-muted-foreground mt-0.5">{listing.setName}</p>
           )}
+          {listing.notes && (
+            <p className="text-xs text-muted-foreground/70 mt-0.5 italic line-clamp-2">{listing.notes}</p>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 flex-wrap">

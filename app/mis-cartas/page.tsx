@@ -73,6 +73,7 @@ interface EditDraft {
   price: string
   quantity: string
   condition: string
+  language: string
 }
 
 export default function MisCartasPage() {
@@ -118,7 +119,7 @@ export default function MisCartasPage() {
 
   // Inline edit state
   const [editingId, setEditingId] = React.useState<string | null>(null)
-  const [editDraft, setEditDraft] = React.useState<EditDraft>({ price: '', quantity: '', condition: '' })
+  const [editDraft, setEditDraft] = React.useState<EditDraft>({ price: '', quantity: '', condition: '', language: 'en' })
   const [saving, setSaving] = React.useState(false)
 
   // Edition picker state
@@ -408,6 +409,7 @@ export default function MisCartasPage() {
       price: listing.price.toString(),
       quantity: listing.quantity.toString(),
       condition: listing.condition,
+      language: listing.language,
     })
     setPrintPickerId(null)
   }
@@ -429,13 +431,14 @@ export default function MisCartasPage() {
           price: parseFloat(editDraft.price),
           quantity: parseInt(editDraft.quantity),
           condition: editDraft.condition,
+          language: editDraft.language,
         }),
       })
       if (!res.ok) throw new Error()
       setListings((prev) =>
         prev.map((l) =>
           l.id === editingId
-            ? { ...l, price: parseFloat(editDraft.price), quantity: parseInt(editDraft.quantity), condition: editDraft.condition }
+            ? { ...l, price: parseFloat(editDraft.price), quantity: parseInt(editDraft.quantity), condition: editDraft.condition, language: editDraft.language }
             : l
         )
       )
@@ -1042,6 +1045,30 @@ export default function MisCartasPage() {
                             >
                               {['NM', 'LP', 'MP', 'HP', 'DMG'].map((c) => (
                                 <option key={c} value={c}>{c}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs text-muted-foreground">Idioma</label>
+                            <select
+                              value={editDraft.language}
+                              onChange={(e) => setEditDraft((d) => ({ ...d, language: e.target.value }))}
+                              className="h-8 text-sm border border-border rounded px-2 bg-background"
+                            >
+                              {[
+                                { code: 'en', label: 'Inglés' },
+                                { code: 'es', label: 'Español' },
+                                { code: 'pt', label: 'Portugués' },
+                                { code: 'fr', label: 'Francés' },
+                                { code: 'de', label: 'Alemán' },
+                                { code: 'it', label: 'Italiano' },
+                                { code: 'ja', label: 'Japonés' },
+                                { code: 'ko', label: 'Coreano' },
+                                { code: 'ru', label: 'Ruso' },
+                                { code: 'zhs', label: 'Chino Simp.' },
+                                { code: 'zht', label: 'Chino Trad.' },
+                              ].map(({ code, label }) => (
+                                <option key={code} value={code}>{label}</option>
                               ))}
                             </select>
                           </div>
