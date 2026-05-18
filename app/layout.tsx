@@ -10,6 +10,14 @@ const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
 export const metadata: Metadata = {
   title: 'Magic Market — Comunidad',
   description: 'Marketplace de cartas Magic: The Gathering para la comunidad',
+  openGraph: {
+    title: 'Magic Market — Comunidad',
+    description: 'Marketplace de cartas Magic: The Gathering para la comunidad',
+    url: 'https://magic.brolas.com.ar',
+    siteName: 'Magic Market',
+    images: [{ url: 'https://magic.brolas.com.ar/logo.png', width: 512, height: 512 }],
+    type: 'website',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
