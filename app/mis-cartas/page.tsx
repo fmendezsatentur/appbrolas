@@ -14,6 +14,7 @@ import { type SealedListingWithUser } from '@/components/SealedItem'
 import AddAuctionDialog from '@/components/AddAuctionDialog'
 import { type AuctionWithMeta } from '@/components/AuctionCard'
 import AddWantedDialog from '@/components/AddWantedDialog'
+import WishlistImportDialog from '@/components/WishlistImportDialog'
 import { type WantedListingWithUser } from '@/components/WantedCard'
 import Link from 'next/link'
 import {
@@ -108,6 +109,7 @@ export default function MisCartasPage() {
   interface WishlistItem { id: string; cardName: string; createdAt: string }
   const [wishlist, setWishlist] = React.useState<WishlistItem[]>([])
   const [loadingWishlist, setLoadingWishlist] = React.useState(false)
+  const [wishlistImportOpen, setWishlistImportOpen] = React.useState(false)
   const [wishlistInput, setWishlistInput] = React.useState('')
   const [addingWish, setAddingWish] = React.useState(false)
   const [wishSuggestions, setWishSuggestions] = React.useState<{ id: string; name: string; image: string }[]>([])
@@ -290,6 +292,11 @@ export default function MisCartasPage() {
       toast.success(`${name} eliminada de la wishlist`)
       setWishlist(prev => prev.filter(w => w.id !== id))
     }
+  }
+
+  const handleWishImported = async (added: number) => {
+    toast.success(`${added} cartas agregadas a tu wishlist`)
+    await fetchWishlist()
   }
 
   const handleWishInputChange = (val: string) => {
@@ -584,6 +591,12 @@ export default function MisCartasPage() {
             )}
             {pageTab === 'wanted' && (
               <AddWantedDialog onCreated={fetchMyWanted} />
+            )}
+            {pageTab === 'wishlist' && (
+              <Button variant="outline" className="gap-2" onClick={() => setWishlistImportOpen(true)}>
+                <Upload className="h-4 w-4" />
+                Importar Moxfield
+              </Button>
             )}
           </div>
         </div>
@@ -1110,6 +1123,11 @@ export default function MisCartasPage() {
       <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImport={handleImport} />
       <AddCardDialog open={addOpen} onOpenChange={setAddOpen} onSave={publishCard} />
       <AddSealedDialog open={addSealedOpen} onOpenChange={setAddSealedOpen} onSave={publishSealed} />
+      <WishlistImportDialog
+        open={wishlistImportOpen}
+        onOpenChange={setWishlistImportOpen}
+        onImported={handleWishImported}
+      />
       <AddSealedDialog
         open={!!editingSealed}
         onOpenChange={(v) => { if (!v) setEditingSealed(null) }}
