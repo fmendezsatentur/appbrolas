@@ -66,7 +66,7 @@ interface PrintInfo {
   set_name: string
   collector_number: string
   imageUrl: string | null
-  prices: { usd: string | null; usd_foil: string | null }
+  prices: { retail: number | null; retail_foil: number | null }
   released_at: string
 }
 
@@ -487,8 +487,7 @@ export default function MisCartasPage() {
   }
 
   const selectPrint = async (listingId: string, print: PrintInfo, isFoil: boolean) => {
-    const priceStr = isFoil ? print.prices.usd_foil : print.prices.usd
-    const priceRef = priceStr ? parseFloat(priceStr) : null
+    const priceRef = isFoil ? print.prices.retail_foil : print.prices.retail
 
     const res = await fetch(`/api/cards/${listingId}`, {
       method: 'PATCH',
@@ -1189,8 +1188,8 @@ export default function MisCartasPage() {
                                       <p className="text-[10px] font-medium leading-tight truncate">{print.set_name}</p>
                                       <p className="text-[10px] text-muted-foreground">
                                         {print.set.toUpperCase()} #{print.collector_number}
-                                        {(listing.isFoil ? print.prices.usd_foil : print.prices.usd)
-                                          ? ` · $${listing.isFoil ? print.prices.usd_foil : print.prices.usd}`
+                                        {(listing.isFoil ? print.prices.retail_foil : print.prices.retail)
+                                          ? ` · $${(listing.isFoil ? print.prices.retail_foil : print.prices.retail)?.toFixed(2)}`
                                           : ''}
                                       </p>
                                     </div>

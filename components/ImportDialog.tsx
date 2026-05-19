@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Loader2, Upload, Search, AlertCircle } from 'lucide-react'
 import type { ParsedCard } from '@/lib/moxfield'
-import { getCardImageUrl, getCardPrice } from '@/lib/scryfall'
+import { getCardImageUrl } from '@/lib/scryfall'
 
 export interface CardToPublish {
   cardName: string
@@ -98,14 +98,27 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
         }
       } catch {}
 
+      // Fetch CK prices for all card names in batch
+      const ckMap: Record<string, { retail: number | null; retail_foil: number | null }> = {}
+      try {
+        const names = [...new Set(batch.map(c => c.name))]
+        const ckRes = await fetch('/api/ck/price', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ names }),
+        })
+        if (ckRes.ok) Object.assign(ckMap, await ckRes.json())
+      } catch {}
+
       for (const card of batch) {
         const key = card.setCode && card.collectorNumber
           ? `${card.setCode.toLowerCase()}:${card.collectorNumber}`
           : card.name.toLowerCase()
         const sf = sfMap.get(key) ?? sfMap.get(card.name.toLowerCase())
+        const ckPrice = ckMap[card.name] ?? ckMap[sf?.name] ?? null
+        const priceRef = ckPrice?.retail ?? undefined
 
         if (sf) {
-          const priceRef = getCardPrice(sf) ?? undefined
           results.push({
             cardName: sf.name,
             setName: sf.set_name,
@@ -150,7 +163,11 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
       if (res.ok) {
         const sf = await res.json()
         if (!sf.error) {
-          const priceRef = getCardPrice(sf) ?? undefined
+          let priceRef: number | undefined
+          try {
+            const ckRes = await fetch(`/api/ck/price?name=${encodeURIComponent(sf.name)}`)
+            if (ckRes.ok) { const d = await ckRes.json(); priceRef = d.retail ?? undefined }
+          } catch {}
           setEnriched((prev) => prev.map((c, idx) => idx === i ? {
             ...c,
             cardName: sf.name,

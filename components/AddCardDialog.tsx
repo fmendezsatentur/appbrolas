@@ -32,7 +32,7 @@ interface PrintOption {
   set_name: string
   collector_number: string
   imageUrl: string | null
-  prices: { usd: string | null; usd_foil: string | null }
+  prices: { retail: number | null; retail_foil: number | null }
   released_at: string
   colors: string[]
 }
@@ -99,8 +99,8 @@ export function AddCardDialog({ open, onOpenChange, onSave, initialData }: AddCa
   const selectPrint = (print: PrintOption) => {
     setSelectedPrint(print)
     const priceRef = form.isFoil
-      ? parseFloat(print.prices.usd_foil ?? '0') || undefined
-      : parseFloat(print.prices.usd ?? '0') || undefined
+      ? print.prices.retail_foil ?? undefined
+      : print.prices.retail ?? undefined
     setForm((prev) => ({ ...prev, price: priceRef ?? prev.price }))
     setStep('details')
   }
@@ -119,8 +119,8 @@ export function AddCardDialog({ open, onOpenChange, onSave, initialData }: AddCa
         scryfallId: selectedPrint.id,
         colors: selectedPrint.colors,
         priceRef: form.isFoil
-          ? parseFloat(selectedPrint.prices.usd_foil ?? '0') || undefined
-          : parseFloat(selectedPrint.prices.usd ?? '0') || undefined,
+          ? selectedPrint.prices.retail_foil ?? undefined
+          : selectedPrint.prices.retail ?? undefined,
         ...form,
         price: Number(form.price),
         quantity: Number(form.quantity),
@@ -216,8 +216,8 @@ export function AddCardDialog({ open, onOpenChange, onSave, initialData }: AddCa
                     )}
                     <span className="text-xs font-medium leading-tight">{p.set_name}</span>
                     <span className="text-xs text-muted-foreground">{p.released_at?.slice(0, 4)}</span>
-                    {p.prices.usd && (
-                      <span className="text-xs text-primary font-bold">${p.prices.usd}</span>
+                    {p.prices.retail && (
+                      <span className="text-xs text-primary font-bold">${p.prices.retail.toFixed(2)}</span>
                     )}
                   </button>
                 ))}
@@ -268,9 +268,9 @@ export function AddCardDialog({ open, onOpenChange, onSave, initialData }: AddCa
                   <div className="space-y-1">
                     <Label>
                       Precio (USD)
-                      {selectedPrint.prices.usd && (
+                      {(form.isFoil ? selectedPrint.prices.retail_foil : selectedPrint.prices.retail) && (
                         <span className="text-xs text-muted-foreground ml-1">
-                          · Ref TCG: ${form.isFoil ? selectedPrint.prices.usd_foil : selectedPrint.prices.usd}
+                          · Ref CK: ${form.isFoil ? selectedPrint.prices.retail_foil?.toFixed(2) : selectedPrint.prices.retail?.toFixed(2)}
                         </span>
                       )}
                     </Label>
@@ -290,8 +290,8 @@ export function AddCardDialog({ open, onOpenChange, onSave, initialData }: AddCa
                     type="checkbox" id="foil" checked={form.isFoil}
                     onChange={(e) => {
                       set('isFoil', e.target.checked)
-                      const p = e.target.checked ? selectedPrint.prices.usd_foil : selectedPrint.prices.usd
-                      if (p) set('price', parseFloat(p))
+                      const p = e.target.checked ? selectedPrint.prices.retail_foil : selectedPrint.prices.retail
+                      if (p) set('price', p)
                     }}
                     className="rounded"
                   />
