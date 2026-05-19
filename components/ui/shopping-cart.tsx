@@ -14,8 +14,10 @@ export interface CartItem {
   quantity: number
   maxQuantity: number
   imageUrl: string
+  sellerId?: string
   sellerName: string
   sellerPhone: string | null
+  sellerMpConnected?: boolean
   condition: string
   isFoil: boolean
 }

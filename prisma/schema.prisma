@@ -26,6 +26,9 @@ model User {
   bidReactions    BidReaction[]
   wantedListings  WantedListing[]
   wishlistItems   WishlistItem[]
+  mpAccessToken   String?
+  mpRefreshToken  String?
+  mpUserId        String?
   createdAt       DateTime        @default(now())
   updatedAt     DateTime      @updatedAt
 }

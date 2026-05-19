@@ -8,9 +8,11 @@ export async function GET() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, name: true, email: true, image: true, phone: true },
+    select: { id: true, name: true, email: true, image: true, phone: true, mpUserId: true },
   })
-  return NextResponse.json(user)
+  if (!user) return NextResponse.json(null)
+  const { mpUserId, ...rest } = user
+  return NextResponse.json({ ...rest, mpConnected: !!mpUserId })
 }
 
 export async function PATCH(request: NextRequest) {

@@ -138,6 +138,15 @@ export default function MisCartasPage() {
     if (status === 'unauthenticated') router.push('/login')
   }, [status, router])
 
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const mp = params.get('mp')
+    if (mp === 'connected') { toast.success('✅ Mercado Pago conectado correctamente'); window.history.replaceState({}, '', '/mis-cartas') }
+    if (mp === 'success')   { toast.success('✅ Pago confirmado. ¡Gracias!'); window.history.replaceState({}, '', '/mis-cartas') }
+    if (mp === 'error')     { toast.error('Error al conectar con Mercado Pago'); window.history.replaceState({}, '', '/mis-cartas') }
+    if (mp === 'pending')   { toast.info('Pago pendiente — te avisaremos cuando se confirme'); window.history.replaceState({}, '', '/mis-cartas') }
+  }, [])
+
   const fetchMyListings = async () => {
     if (!session?.user?.id) return
     setLoading(true)
@@ -1231,10 +1240,11 @@ export default function MisCartasPage() {
 
 // ─── OrderList sub-component ────────────────────────────────────────────────
 
-const STATUS_STYLES = {
-  pending:   { label: 'Pendiente',  icon: <Clock className="h-3.5 w-3.5" />,        cls: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' },
-  completed: { label: 'Concretada', icon: <CheckCircle2 className="h-3.5 w-3.5" />, cls: 'bg-green-500/10 text-green-400 border-green-500/30' },
-  cancelled: { label: 'Cancelada',  icon: <XCircle className="h-3.5 w-3.5" />,      cls: 'bg-red-500/10 text-red-400 border-red-500/30' },
+const STATUS_STYLES: Record<string, { label: string; icon: React.ReactNode; cls: string }> = {
+  pending:          { label: 'Pendiente',        icon: <Clock className="h-3.5 w-3.5" />,        cls: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' },
+  awaiting_payment: { label: 'Esperando pago',   icon: <Clock className="h-3.5 w-3.5" />,        cls: 'bg-blue-500/10 text-blue-400 border-blue-500/30' },
+  completed:        { label: 'Concretada',       icon: <CheckCircle2 className="h-3.5 w-3.5" />, cls: 'bg-green-500/10 text-green-400 border-green-500/30' },
+  cancelled:        { label: 'Cancelada',        icon: <XCircle className="h-3.5 w-3.5" />,      cls: 'bg-red-500/10 text-red-400 border-red-500/30' },
 }
 
 function OrderList({

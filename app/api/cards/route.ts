@@ -31,12 +31,16 @@ export async function GET(request: NextRequest) {
       ...(color && { colors: { has: color } }),
     },
     include: {
-      user: { select: { id: true, name: true, email: true, image: true, phone: true } },
+      user: { select: { id: true, name: true, email: true, image: true, phone: true, mpUserId: true } },
     },
     orderBy,
   })
 
-  return NextResponse.json(listings)
+  const mapped = listings.map(({ user, ...l }) => ({
+    ...l,
+    user: { id: user.id, name: user.name, email: user.email, image: user.image, phone: user.phone, mpConnected: !!user.mpUserId },
+  }))
+  return NextResponse.json(mapped)
 }
 
 export async function POST(request: NextRequest) {

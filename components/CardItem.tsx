@@ -23,6 +23,7 @@ export interface ListingWithUser {
     name: string | null
     image: string | null
     phone: string | null
+    mpConnected?: boolean
   }
 }
 
