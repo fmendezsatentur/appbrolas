@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const res = await fetch(
-      `https://api.scryfall.com/cards/search?q=!"${encodeURIComponent(name)}"&unique=prints&order=released`,
+      `https://api.scryfall.com/cards/search?q=!"${encodeURIComponent(name)}" include:extras&unique=prints&order=released`,
       { next: { revalidate: 3600 } }
     )
     if (!res.ok) return NextResponse.json({ data: [] })
