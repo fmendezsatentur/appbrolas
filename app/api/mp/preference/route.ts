@@ -59,6 +59,10 @@ export async function POST(request: NextRequest) {
     data: { isActive: false },
   })
 
+  // Fetch exchange rate
+  const rateRow = await prisma.appConfig.findUnique({ where: { key: 'usdToArs' } })
+  const exchangeRate = rateRow ? parseFloat(rateRow.value) : 1400
+
   // Create MP preference using seller's access token
   const appUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? 'https://magic.brolas.com.ar'
 
@@ -72,7 +76,7 @@ export async function POST(request: NextRequest) {
       items: listings.map(l => ({
         title: l.cardName + (l.isFoil ? ' (Foil)' : ''),
         quantity: l.quantity,
-        unit_price: l.price,
+        unit_price: Math.round(l.price * exchangeRate),
         currency_id: 'ARS',
       })),
       payer: {

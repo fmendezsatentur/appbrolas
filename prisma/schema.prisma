@@ -185,6 +185,11 @@ model SealedListing {
   @@index([isActive])
 }
 
+model AppConfig {
+  key   String @id
+  value String
+}
+
 model CardListing {
   id              String   @id @default(cuid())
   userId          String

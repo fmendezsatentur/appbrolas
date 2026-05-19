@@ -20,6 +20,11 @@ interface SellerGroup {
 export default function CarritoPage() {
   const [cart, setCart] = React.useState<CartItem[]>([])
   const [payingMp, setPayingMp] = React.useState<string | null>(null) // sellerName being paid
+  const [exchangeRate, setExchangeRate] = React.useState<number | null>(null)
+
+  React.useEffect(() => {
+    fetch('/api/config/exchange-rate').then(r => r.json()).then(d => setExchangeRate(d.rate)).catch(() => {})
+  }, [])
 
   React.useEffect(() => {
     try { setCart(JSON.parse(localStorage.getItem('magic-cart') ?? '[]')) } catch { setCart([]) }
@@ -197,6 +202,16 @@ export default function CarritoPage() {
 
                 {/* Payment actions */}
                 <div className="px-4 py-3 border-t border-border bg-muted/20 flex flex-col sm:flex-row gap-2">
+                  {group.sellerMpConnected && exchangeRate && (
+                    <div className="w-full flex items-center gap-3 mb-1 px-1">
+                      <Image src="/usd-ars.png" alt="Tipo de cambio" width={120} height={40} className="object-contain rounded" />
+                      <span className="text-xs text-muted-foreground">
+                        Total en pesos: <span className="font-semibold text-foreground">
+                          ${Math.round(group.subtotal * exchangeRate).toLocaleString('es-AR')}
+                        </span>
+                      </span>
+                    </div>
+                  )}
                   {group.sellerMpConnected && (
                     <Button
                       className="flex-1 gap-2 bg-blue-600 hover:bg-blue-500 text-white"

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Navbar } from '@/components/Navbar'
 import { Loader2, Users, CreditCard, Package, ShoppingBag, Gavel, Heart, TrendingUp, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import Image from 'next/image'
 
 const ADMIN_EMAIL = 'fmendezsatentur@gmail.com'
 
@@ -54,12 +56,30 @@ export default function AdminPage() {
   const [stats, setStats] = React.useState<Stats | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [lastRefresh, setLastRefresh] = React.useState<Date | null>(null)
+  const [exchangeRate, setExchangeRate] = React.useState<string>('')
+  const [savingRate, setSavingRate] = React.useState(false)
+
+  React.useEffect(() => {
+    fetch('/api/config/exchange-rate').then(r => r.json()).then(d => setExchangeRate(String(d.rate))).catch(() => {})
+  }, [])
 
   React.useEffect(() => {
     if (status === 'unauthenticated') { router.push('/login'); return }
     if (status === 'authenticated' && session.user?.email !== ADMIN_EMAIL) { router.push('/'); return }
     if (status === 'authenticated') fetchStats()
   }, [status])
+
+  const saveExchangeRate = async () => {
+    setSavingRate(true)
+    try {
+      const res = await fetch('/api/config/exchange-rate', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rate: exchangeRate }),
+      })
+      if (res.ok) { const d = await res.json(); setExchangeRate(String(d.rate)) }
+    } finally { setSavingRate(false) }
+  }
 
   const fetchStats = async () => {
     setLoading(true)
@@ -153,6 +173,28 @@ export default function AdminPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <StatCard icon={<Heart className="h-3.5 w-3.5" />} label="Items en wishlists" value={wishlist.total} sub={`${wishlist.users} usuarios con wishlist`} />
             <StatCard icon={<span className="text-sm">🎯</span>} label="Búsquedas activas" value={wanted.total} />
+          </div>
+        </section>
+
+        {/* Tipo de cambio */}
+        <section>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Tipo de cambio (USD → ARS)</h2>
+          <div className="rounded-xl border border-border bg-card p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <Image src="/usd-ars.png" alt="Tipo de cambio" width={140} height={48} className="object-contain rounded" />
+            <div className="flex items-center gap-3 flex-1">
+              <span className="text-sm text-muted-foreground whitespace-nowrap">1 USD =</span>
+              <Input
+                type="number"
+                min={1}
+                value={exchangeRate}
+                onChange={e => setExchangeRate(e.target.value)}
+                className="w-32"
+              />
+              <span className="text-sm text-muted-foreground">ARS</span>
+              <Button size="sm" onClick={saveExchangeRate} disabled={savingRate}>
+                {savingRate ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Guardar'}
+              </Button>
+            </div>
           </div>
         </section>
 
