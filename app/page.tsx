@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Search, X, ArrowUpDown } from 'lucide-react'
 import type { CartItem } from '@/components/ui/shopping-cart'
+import Image from 'next/image'
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG']
 const SEALED_TAGS = ['SOBRES', 'MAZO COMMANDER', 'MAZO PAUPER', 'BUNDLE', 'PRECON', 'OTROS']
@@ -78,6 +79,11 @@ export default function MarketplacePage() {
       } catch { setSuggestions([]) }
     }, 200)
   }
+
+  const [exchangeRate, setExchangeRate] = React.useState<number | null>(null)
+  React.useEffect(() => {
+    fetch('/api/config/exchange-rate').then(r => r.json()).then(d => setExchangeRate(d.rate)).catch(() => {})
+  }, [])
 
   const [cart, setCart] = React.useState<CartItem[]>(() => {
     if (typeof window === 'undefined') return []
@@ -212,8 +218,11 @@ export default function MarketplacePage() {
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8">
         {/* Header */}
-        <div className="mb-6 space-y-1">
+        <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
           <h1 className="text-3xl font-bold tracking-tight">Marketplace</h1>
+          {exchangeRate && (
+            <Image src="/usd-ars.png" alt={`1 USD = $${exchangeRate} ARS`} width={160} height={52} className="object-contain rounded" />
+          )}
         </div>
 
         {/* Tabs */}
