@@ -1,7 +1,8 @@
 interface CKItem {
   name: string
-  is_foil: boolean
-  price_retail: number
+  is_foil: string   // "true" | "false"
+  price_retail: string
+  scryfall_id?: string
 }
 
 interface CKCache {
@@ -28,9 +29,9 @@ export async function getCKMaps(): Promise<{ normal: Map<string, number>; foil: 
 
     for (const item of (json.data ?? []) as CKItem[]) {
       const key = String(item.name).toLowerCase()
-      const price = Number(item.price_retail)
+      const price = parseFloat(item.price_retail)
       if (!price || price <= 0) continue
-      if (item.is_foil) { if (!foil.has(key)) foil.set(key, price) }
+      if (item.is_foil === 'true') { if (!foil.has(key)) foil.set(key, price) }
       else { if (!normal.has(key)) normal.set(key, price) }
     }
 
