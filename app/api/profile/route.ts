@@ -19,12 +19,17 @@ export async function PATCH(request: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const { phone } = await request.json()
+  const { phone, name, image } = await request.json()
+
+  const data: Record<string, string | null> = {}
+  if (phone !== undefined) data.phone = phone?.trim() || null
+  if (name  !== undefined) data.name  = name?.trim()  || null
+  if (image !== undefined) data.image = image || null
 
   const user = await prisma.user.update({
     where: { id: session.user.id },
-    data: { phone: phone?.trim() || null },
-    select: { id: true, name: true, phone: true },
+    data,
+    select: { id: true, name: true, phone: true, image: true },
   })
   return NextResponse.json(user)
 }
