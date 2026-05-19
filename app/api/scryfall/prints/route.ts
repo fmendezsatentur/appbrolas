@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCKMaps } from '@/lib/cardkingdom'
+import { getCKMaps, lookupCKPrices } from '@/lib/cardkingdom'
 
 export async function GET(request: NextRequest) {
   const name = new URL(request.url).searchParams.get('name')
@@ -16,9 +16,6 @@ export async function GET(request: NextRequest) {
     if (!res.ok) return NextResponse.json({ data: [] })
 
     const data = await res.json()
-    const nameKey = name.toLowerCase()
-    const ckRetail = ckMaps.normal.get(nameKey) ?? null
-    const ckRetailFoil = ckMaps.foil.get(nameKey) ?? null
 
     const prints = (data.data ?? []).map((card: any) => ({
       id: card.id,
@@ -27,7 +24,7 @@ export async function GET(request: NextRequest) {
       set_name: card.set_name,
       collector_number: card.collector_number,
       imageUrl: card.image_uris?.normal ?? card.card_faces?.[0]?.image_uris?.normal ?? null,
-      prices: { retail: ckRetail, retail_foil: ckRetailFoil },
+      prices: lookupCKPrices(ckMaps, card.id, card.name),
       released_at: card.released_at,
       lang: card.lang,
       colors: card.color_identity ?? [],

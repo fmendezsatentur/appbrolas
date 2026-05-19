@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCKMaps } from '@/lib/cardkingdom'
 
 export async function GET(request: NextRequest) {
-  const name = new URL(request.url).searchParams.get('name')
+  const name = new URL(request.url).searchParams.get('name') ?? ''
   if (!name) return NextResponse.json({ retail: null, retail_foil: null })
 
   const maps = await getCKMaps()
   const key = name.toLowerCase()
   return NextResponse.json({
-    retail: maps.normal.get(key) ?? null,
-    retail_foil: maps.foil.get(key) ?? null,
+    retail: maps.normalByName.get(key) ?? null,
+    retail_foil: maps.foilByName.get(key) ?? null,
   })
 }
 
@@ -23,8 +23,8 @@ export async function POST(request: NextRequest) {
   for (const name of names as string[]) {
     const key = name.toLowerCase()
     result[name] = {
-      retail: maps.normal.get(key) ?? null,
-      retail_foil: maps.foil.get(key) ?? null,
+      retail: maps.normalByName.get(key) ?? null,
+      retail_foil: maps.foilByName.get(key) ?? null,
     }
   }
   return NextResponse.json(result)
