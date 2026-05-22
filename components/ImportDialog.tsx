@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Loader2, Upload, Search, AlertCircle } from 'lucide-react'
 import type { ParsedCard } from '@/lib/moxfield'
 import { getCardImageUrl } from '@/lib/scryfall'
+import { toast } from 'sonner'
 
 export interface CardToPublish {
   cardName: string
@@ -151,7 +152,10 @@ export function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps
       setEnrichProgress(Math.round((Math.min(start + BATCH, cards.length) / cards.length) * 100))
     }
 
-    setEnriched(results)
+    const withImage = results.filter(c => !!c.imageUrl)
+    const skipped = results.length - withImage.length
+    if (skipped > 0) toast.warning(`${skipped} carta${skipped > 1 ? 's' : ''} sin imagen en Scryfall fueron descartadas`)
+    setEnriched(withImage)
     setStep('review')
   }
 

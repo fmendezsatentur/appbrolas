@@ -95,6 +95,9 @@ export async function POST(request: NextRequest) {
   if (!cardName || !price || !quantity) {
     return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
   }
+  if (!imageUrl) {
+    return NextResponse.json({ error: 'La carta debe tener una imagen válida de Scryfall.' }, { status: 400 })
+  }
 
   const listing = await prisma.cardListing.create({
     data: {

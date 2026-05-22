@@ -200,20 +200,14 @@ export function AddCardDialog({ open, onOpenChange, onSave, initialData }: AddCa
               </div>
             ) : (
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-[50vh] overflow-y-auto pr-1">
-                {prints.map((p) => (
+                {prints.filter(p => p.imageUrl).map((p) => (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => selectPrint(p)}
                     className="flex flex-col items-center gap-1 p-2 rounded-lg border border-border hover:border-primary hover:bg-accent transition-colors text-center"
                   >
-                    {p.imageUrl ? (
-                      <img src={p.imageUrl} alt={p.set_name} className="w-full rounded-md" />
-                    ) : (
-                      <div className="w-full aspect-[2/3] bg-muted rounded-md flex items-center justify-center text-xs text-muted-foreground">
-                        Sin imagen
-                      </div>
-                    )}
+                    <img src={p.imageUrl!} alt={p.set_name} className="w-full rounded-md" />
                     <span className="text-xs font-medium leading-tight">{p.set_name}</span>
                     <span className="text-xs text-muted-foreground">{p.released_at?.slice(0, 4)}</span>
                     {p.prices.retail && (
