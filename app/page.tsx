@@ -14,14 +14,14 @@ import { Search, X, ArrowUpDown } from 'lucide-react'
 import type { CartItem } from '@/components/ui/shopping-cart'
 import Image from 'next/image'
 
-const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG']
 const SEALED_TAGS = ['SOBRES', 'MAZO COMMANDER', 'MAZO PAUPER', 'BUNDLE', 'PRECON', 'OTROS']
 const COLORS = [
-  { code: 'W', label: 'Blanco', bg: 'bg-yellow-100', border: 'border-yellow-400', text: 'text-yellow-800', symbol: '☀' },
-  { code: 'U', label: 'Azul',   bg: 'bg-blue-500',   border: 'border-blue-700',   text: 'text-white',      symbol: '💧' },
-  { code: 'B', label: 'Negro',  bg: 'bg-gray-800',   border: 'border-gray-600',   text: 'text-gray-100',   symbol: '💀' },
-  { code: 'R', label: 'Rojo',   bg: 'bg-red-600',    border: 'border-red-800',    text: 'text-white',      symbol: '🔥' },
-  { code: 'G', label: 'Verde',  bg: 'bg-green-600',  border: 'border-green-800',  text: 'text-white',      symbol: '🌲' },
+  { code: 'W', label: 'Blanco',   bg: 'bg-yellow-100', border: 'border-yellow-400', text: 'text-yellow-800', symbol: '☀' },
+  { code: 'U', label: 'Azul',     bg: 'bg-blue-500',   border: 'border-blue-700',   text: 'text-white',      symbol: '💧' },
+  { code: 'B', label: 'Negro',    bg: 'bg-gray-800',   border: 'border-gray-600',   text: 'text-gray-100',   symbol: '💀' },
+  { code: 'R', label: 'Rojo',     bg: 'bg-red-600',    border: 'border-red-800',    text: 'text-white',      symbol: '🔥' },
+  { code: 'G', label: 'Verde',    bg: 'bg-green-600',  border: 'border-green-800',  text: 'text-white',      symbol: '🌲' },
+  { code: 'C', label: 'Incoloro', bg: 'bg-gray-500',   border: 'border-gray-300',   text: 'text-white',      symbol: '◇' },
 ]
 
 type GroupedListing = ListingWithUser & { allIds: string[] }
@@ -45,12 +45,19 @@ export default function MarketplacePage() {
   const [listings, setListings] = React.useState<ListingWithUser[]>([])
   const [loadingCards, setLoadingCards] = React.useState(true)
   const [search, setSearch] = React.useState('')
-  const [condition, setCondition] = React.useState<string | null>(null)
   const [color, setColor] = React.useState<string | null>(null)
   const [sellerSearch, setSellerSearch] = React.useState('')
+  const [setFilter, setSetFilter] = React.useState<string | null>(null)
+  const [setInput, setSetInput] = React.useState('')
+  const [setOptions, setSetOptions] = React.useState<string[]>([])
+  const [showSetOptions, setShowSetOptions] = React.useState(false)
+  const setDebounce = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const [suggestions, setSuggestions] = React.useState<string[]>([])
   const [showSuggestions, setShowSuggestions] = React.useState(false)
   const suggestDebounce = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [page, setPage] = React.useState(1)
+  const [totalPages, setTotalPages] = React.useState(1)
+  const [totalCards, setTotalCards] = React.useState(0)
 
   // Sealed filters
   const [sealed, setSealed] = React.useState<SealedListingWithUser[]>([])
@@ -80,6 +87,19 @@ export default function MarketplacePage() {
     }, 200)
   }
 
+  const fetchSetSuggestions = (q: string) => {
+    if (setDebounce.current) clearTimeout(setDebounce.current)
+    if (q.length < 1) { setSetOptions([]); setShowSetOptions(false); return }
+    setDebounce.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/cards/sets?q=${encodeURIComponent(q)}`)
+        const data: string[] = await res.json()
+        setSetOptions(data)
+        setShowSetOptions(data.length > 0)
+      } catch { setSetOptions([]) }
+    }, 200)
+  }
+
   const [exchangeRate, setExchangeRate] = React.useState<number | null>(null)
   React.useEffect(() => {
     fetch('/api/config/exchange-rate').then(r => r.json()).then(d => setExchangeRate(d.rate)).catch(() => {})
@@ -95,26 +115,35 @@ export default function MarketplacePage() {
   }, [cart])
 
   // Fetch cards
-  const fetchListings = React.useCallback(async () => {
+  const fetchListings = React.useCallback(async (p = page) => {
     setLoadingCards(true)
     try {
       const params = new URLSearchParams()
       if (search) params.set('search', search)
-      if (condition) params.set('condition', condition)
       if (color) params.set('color', color)
       if (sellerSearch.trim()) params.set('sellerName', sellerSearch.trim())
+      if (setFilter) params.set('setName', setFilter)
       params.set('sort', sort)
+      params.set('page', String(p))
       const res = await fetch(`/api/cards?${params}`)
-      setListings(await res.json())
+      const { data, total, pages } = await res.json()
+      setListings(data)
+      setTotalCards(total)
+      setTotalPages(pages)
     } finally { setLoadingCards(false) }
-  }, [search, condition, color, sellerSearch, sort])
+  }, [search, color, sellerSearch, setFilter, sort, page])
 
   React.useEffect(() => {
     if (tab === 'cards') {
-      const t = setTimeout(fetchListings, 300)
+      setPage(1)
+      const t = setTimeout(() => fetchListings(1), 300)
       return () => clearTimeout(t)
     }
-  }, [fetchListings, tab])
+  }, [search, color, sellerSearch, setFilter, sort, tab])
+
+  React.useEffect(() => {
+    if (tab === 'cards') fetchListings(page)
+  }, [page])
 
   // Fetch sealed
   const fetchSealed = React.useCallback(async () => {
@@ -205,7 +234,7 @@ export default function MarketplacePage() {
   }
 
   const cartItemIds = new Set(cart.map((i) => i.listingId))
-  const hasCardFilters = !!(search || condition || color || sellerSearch)
+  const hasCardFilters = !!(search || color || sellerSearch || setFilter)
 
   const sortLabel = sort === 'price_asc' ? 'Menor precio' : sort === 'price_desc' ? 'Mayor precio' : 'Más recientes'
 
@@ -235,7 +264,7 @@ export default function MarketplacePage() {
             }`}
           >
             Cartas sueltas
-            {!loadingCards && <span className="ml-2 text-xs font-normal text-muted-foreground">({grouped.length})</span>}
+            {!loadingCards && <span className="ml-2 text-xs font-normal text-muted-foreground">({totalCards})</span>}
           </button>
           <button
             type="button"
@@ -325,20 +354,46 @@ export default function MarketplacePage() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 items-center">
-                {CONDITIONS.map((c) => (
-                  <Button key={c} size="sm" variant={condition === c ? 'default' : 'outline'} className="bg-background/80 backdrop-blur-sm" onClick={() => setCondition((prev) => (prev === c ? null : c))}>
-                    {c}
-                  </Button>
-                ))}
-                <div className="w-px h-6 bg-border mx-1" />
                 {COLORS.map((c) => (
                   <button key={c.code} type="button" title={c.label} onClick={() => setColor((prev) => (prev === c.code ? null : c.code))}
                     className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs transition-all ${c.bg} ${c.text} ${color === c.code ? `${c.border} ring-2 ring-offset-1 ring-offset-background ring-primary scale-110` : 'border-transparent opacity-70 hover:opacity-100'}`}>
                     {c.symbol}
                   </button>
                 ))}
+                <div className="w-px h-6 bg-border mx-1" />
+                {/* Set filter */}
+                <div className="relative">
+                  <Input
+                    value={setInput}
+                    onChange={e => {
+                      setSetInput(e.target.value)
+                      if (!e.target.value) { setSetFilter(null) }
+                      fetchSetSuggestions(e.target.value)
+                    }}
+                    onBlur={() => setTimeout(() => setShowSetOptions(false), 150)}
+                    placeholder="Filtrar por edición..."
+                    className={`bg-background/80 backdrop-blur-sm h-9 text-sm w-48 ${setFilter ? 'border-primary' : ''}`}
+                  />
+                  {setFilter && (
+                    <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => { setSetFilter(null); setSetInput('') }}>
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  {showSetOptions && setOptions.length > 0 && (
+                    <div className="absolute z-50 top-full left-0 mt-1 w-64 border border-border bg-popover rounded-lg shadow-lg overflow-hidden">
+                      {setOptions.map(s => (
+                        <button key={s} type="button"
+                          className="w-full text-left px-4 py-2 text-sm hover:bg-accent transition-colors"
+                          onMouseDown={() => { setSetFilter(s); setSetInput(s); setShowSetOptions(false) }}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {hasCardFilters && (
-                  <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => { setSearch(''); setCondition(null); setColor(null); setSellerSearch('') }}>
+                  <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => { setSearch(''); setColor(null); setSellerSearch(''); setSetFilter(null); setSetInput('') }}>
                     <X className="h-3.5 w-3.5" /> Limpiar
                   </Button>
                 )}
@@ -355,11 +410,41 @@ export default function MarketplacePage() {
                 <p className="text-sm mt-1">{hasCardFilters ? 'Probá con otros filtros' : 'Sé el primero en publicar una carta'}</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {grouped.map((listing) => (
-                  <CardItem key={listing.id} listing={listing} onAddToCart={addToCart} isInCart={cartItemIds.has(listing.id)} isSelf={!!session?.user?.id && listing.user.id === session.user.id} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  {grouped.map((listing) => (
+                    <CardItem key={listing.id} listing={listing} onAddToCart={addToCart} isInCart={cartItemIds.has(listing.id)} isSelf={!!session?.user?.id && listing.user.id === session.user.id} />
+                  ))}
+                </div>
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-1 mt-8 flex-wrap">
+                    <button
+                      type="button"
+                      disabled={page <= 1}
+                      onClick={() => setPage(p => p - 1)}
+                      className="px-3 py-1.5 rounded-md border border-border text-sm disabled:opacity-40 hover:bg-accent transition-colors"
+                    >← Anterior</button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => {
+                      if (p === 1 || p === totalPages || (p >= page - 2 && p <= page + 2)) {
+                        return (
+                          <button key={p} type="button" onClick={() => setPage(p)}
+                            className={`w-9 h-9 rounded-md border text-sm transition-colors ${p === page ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-accent'}`}>
+                            {p}
+                          </button>
+                        )
+                      }
+                      if (p === page - 3 || p === page + 3) return <span key={p} className="text-muted-foreground px-1">…</span>
+                      return null
+                    })}
+                    <button
+                      type="button"
+                      disabled={page >= totalPages}
+                      onClick={() => setPage(p => p + 1)}
+                      className="px-3 py-1.5 rounded-md border border-border text-sm disabled:opacity-40 hover:bg-accent transition-colors"
+                    >Siguiente →</button>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

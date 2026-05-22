@@ -10,7 +10,10 @@ export async function GET(request: NextRequest) {
   const sellerName = searchParams.get('sellerName')
   const condition = searchParams.get('condition')
   const color = searchParams.get('color')
+  const setName = searchParams.get('setName')
   const sort = searchParams.get('sort') ?? 'newest'
+  const page = searchParams.get('page') ? parseInt(searchParams.get('page')!) : null
+  const PAGE_SIZE = 60
 
   // When fetching own listings, skip isActive filter so paused listings are visible
   const session = await auth()
@@ -21,25 +24,40 @@ export async function GET(request: NextRequest) {
     sort === 'price_desc' ? { price: 'desc' as const } :
     { createdAt: 'desc' as const }
 
-  const listings = await prisma.cardListing.findMany({
-    where: {
-      ...(!isOwnListings && { isActive: true }),
-      ...(search && { cardName: { contains: search, mode: 'insensitive' } }),
-      ...(seller && { userId: seller }),
-      ...(sellerName && { user: { name: { contains: sellerName, mode: 'insensitive' } } }),
-      ...(condition && { condition }),
-      ...(color && { colors: { has: color } }),
-    },
-    include: {
-      user: { select: { id: true, name: true, email: true, image: true, phone: true, mpUserId: true } },
-    },
-    orderBy,
-  })
+  const where = {
+    ...(!isOwnListings && { isActive: true }),
+    ...(search && { cardName: { contains: search, mode: 'insensitive' as const } }),
+    ...(seller && { userId: seller }),
+    ...(sellerName && { user: { name: { contains: sellerName, mode: 'insensitive' as const } } }),
+    ...(condition && { condition }),
+    ...(color === 'C' ? { colors: { isEmpty: true } } : color ? { colors: { has: color } } : {}),
+    ...(setName && { setName: { contains: setName, mode: 'insensitive' as const } }),
+  }
+
+  const [listings, total] = page !== null
+    ? await Promise.all([
+        prisma.cardListing.findMany({
+          where, include: { user: { select: { id: true, name: true, email: true, image: true, phone: true, mpUserId: true } } },
+          orderBy, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE,
+        }),
+        prisma.cardListing.count({ where }),
+      ])
+    : [
+        await prisma.cardListing.findMany({
+          where, include: { user: { select: { id: true, name: true, email: true, image: true, phone: true, mpUserId: true } } },
+          orderBy,
+        }),
+        null,
+      ]
 
   const mapped = listings.map(({ user, ...l }) => ({
     ...l,
     user: { id: user.id, name: user.name, email: user.email, image: user.image, phone: user.phone, mpConnected: !!user.mpUserId },
   }))
+
+  if (page !== null) {
+    return NextResponse.json({ data: mapped, total, pages: Math.ceil((total ?? 0) / PAGE_SIZE) })
+  }
   return NextResponse.json(mapped)
 }
 
@@ -63,9 +81,9 @@ export async function POST(request: NextRequest) {
   const ADMIN_EMAIL = 'fmendezsatentur@gmail.com'
   if (user.email !== ADMIN_EMAIL) {
     const count = await prisma.cardListing.count({ where: { userId: session.user.id } })
-    if (count >= 200) {
+    if (count >= 1000) {
       return NextResponse.json(
-        { error: 'Límite de 200 cartas por usuario. Eliminá alguna antes de publicar más.' },
+        { error: 'Límite de 1000 cartas por usuario. Eliminá alguna antes de publicar más.' },
         { status: 400 }
       )
     }
